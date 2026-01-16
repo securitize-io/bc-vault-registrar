@@ -18,8 +18,20 @@
 
 pragma solidity ^0.8.22;
 
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
 /// @title MockVault - Simple vault contract that can receive ERC20 tokens
 contract MockVault {
     /// @dev Simple vault that can receive tokens
     constructor() {}
+
+    /**
+     * @dev Withdraws tokens from the vault to a specified address
+     * @param token The token address to withdraw
+     * @param to The address to send the tokens to
+     * @param amount The amount of tokens to withdraw
+     */
+    function withdraw(address token, address to, uint256 amount) external {
+        IERC20(token).transfer(to, amount);
+    }
 }

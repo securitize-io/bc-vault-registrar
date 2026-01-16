@@ -30,6 +30,7 @@ contract MockDeFiProtocol {
 
     event VaultCreated(address indexed investor, address indexed vault);
     event Deposit(address indexed investor, address indexed vault, uint256 amount);
+    event Withdraw(address indexed investor, address indexed vault, uint256 amount);
 
     constructor(address _vaultWhitelister, address _dsToken) {
         vaultWhitelister = IVaultWhitelister(_vaultWhitelister);
@@ -82,5 +83,19 @@ contract MockDeFiProtocol {
      */
     function clearMyVault() external {
         delete investorVaults[msg.sender];
+    }
+
+    /**
+     * @dev Withdraws DSTokens from the vault back to the caller (msg.sender)
+     * @param amount The amount of tokens to withdraw
+     */
+    function withdraw(uint256 amount) external {
+        address vault = investorVaults[msg.sender];
+        if (vault == address(0)) {
+            revert("Vault does not exist");
+        }
+
+        MockVault(vault).withdraw(address(dsToken), msg.sender, amount);
+        emit Withdraw(msg.sender, vault, amount);
     }
 }
