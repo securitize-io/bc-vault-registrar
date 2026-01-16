@@ -31,11 +31,11 @@ export const deployVaultWhitelister = async () => {
     ]);
     await mockDeFiProtocol.waitForDeployment();
 
-    // Grant OPERATOR_ROLE to MockDeFiProtocol (necesario para llamar whitelist())
+    // Grant OPERATOR_ROLE to MockDeFiProtocol (required to call whitelist())
     await vaultWhitelister.addOperator(await mockDeFiProtocol.getAddress());
 
-    // Grant OPERATOR_ROLE to protocol1 para tests directos de whitelist
-    // protocol2 se usa para tests que verifican addOperator, así que no le damos el rol aquí
+    // Grant OPERATOR_ROLE to protocol1 for direct whitelist tests
+    // protocol2 is used for tests that verify addOperator, so we don't grant the role here
     await vaultWhitelister.addOperator(protocol1.address);
 
     return {
