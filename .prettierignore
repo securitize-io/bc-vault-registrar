@@ -1,0 +1,8 @@
+.vscode
+artifacts
+cache
+node_modules
+out
+build
+.coverage_*
+coverage
