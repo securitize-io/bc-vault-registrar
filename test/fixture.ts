@@ -50,11 +50,5 @@ export const deployVaultWhitelister = async () => {
         investor2,
         unauthorized,
         vaults,
-        // Keep old names for backward compatibility
-        owner: admin,
-        protocol: protocol1,
-        investor: investor1,
-        vault: vaults[0],
-        unknownWallet: unauthorized,
     };
 };
