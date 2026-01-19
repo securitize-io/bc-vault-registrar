@@ -1,0 +1,26 @@
+{
+    "semi": true,
+    "trailingComma": "all",
+    "singleQuote": true,
+    "tabWidth": 4,
+    "useTabs": false,
+    "printWidth": 120,
+    "bracketSpacing": true,
+    "overrides": [
+        {
+            "files": "*.sol",
+            "options": {
+                "tabWidth": 4,
+                "singleQuote": false,
+                "bracketSpacing": false,
+                "useTabs": false
+            }
+        },
+        {
+            "files": ["*.js", "*.md"],
+            "options": {
+                "semi": true
+            }
+        }
+    ]
+}

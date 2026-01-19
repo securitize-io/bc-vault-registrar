@@ -1,0 +1,46 @@
+{
+    "name": "@securitize/bc-vault-whitelister",
+    "version": "0.0.1",
+    "description": "Securitize Vault Whitelister - Whitelist vault addresses under existing investor identities",
+    "license": "Apache-2.0",
+    "scripts": {
+        "test": "hardhat test",
+        "compile": "hardhat compile",
+        "coverage": "hardhat coverage",
+        "lint": "npm run lint:js && npm run lint:sol",
+        "lint:js": "eslint . --ext .js,.ts --config eslint.config.mjs",
+        "lint:sol": "solhint 'contracts/**/*.sol'",
+        "lint:fix": "eslint . --ext .js,.ts --config eslint.config.mjs --fix",
+        "format": "prettier --check \"contracts/**/*.sol\" \"contracts/**/**/*.sol\" \"**/*.{ts,js,md,yml}\" --ignore-path .gitignore --plugin prettier-plugin-solidity",
+        "format:fix": "prettier --write \"contracts/**/*.sol\" \"contracts/**/**/*.sol\" \"**/*.{ts,js,md,yml}\" --ignore-path .gitignore --plugin prettier-plugin-solidity"
+    },
+    "contributors": [
+        {
+            "name": "Securitize Blockchain Team",
+            "email": "blockchain@securitize.io"
+        }
+    ],
+    "devDependencies": {
+        "@nomicfoundation/hardhat-chai-matchers": "^2.0.9",
+        "@nomicfoundation/hardhat-ethers": "^3.0.9",
+        "@nomicfoundation/hardhat-network-helpers": "^1.0.12",
+        "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+        "@nomicfoundation/hardhat-verify": "^2.0.14",
+        "@openzeppelin/contracts": "^5.4.0",
+        "@openzeppelin/contracts-upgradeable": "^5.4.0",
+        "@openzeppelin/hardhat-upgrades": "^3.9.1",
+        "@typechain/ethers-v6": "^0.5.1",
+        "@types/chai": "^4.3.20",
+        "@typescript-eslint/eslint-plugin": "^8.34.1",
+        "@typescript-eslint/parser": "^8.34.1",
+        "dotenv": "^16.5.0",
+        "eslint": "^9.29.0",
+        "eslint-config-prettier": "^10.1.5",
+        "ethers": "^6.14.4",
+        "hardhat": "^2.24.3",
+        "prettier": "^3.6.0",
+        "prettier-plugin-solidity": "^2.0.0",
+        "solhint": "^5.1.0",
+        "typescript": "^5.8.3"
+    }
+}
