@@ -36,6 +36,12 @@ abstract contract BaseVaultWhitelister is Errors, UUPSUpgradeable, PausableUpgra
     /// @dev Role for operators who can call whitelist
     bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
 
+    /// @dev Emitted when a protocol is authorized as an operator
+    event ProtocolAuthorized(address indexed protocol);
+
+    /// @dev Emitted when a protocol's operator role is revoked
+    event ProtocolRevoked(address indexed protocol);
+
     /// @dev Storage gap for future upgrades
     uint256[50] private __gap;
 
@@ -95,6 +101,7 @@ abstract contract BaseVaultWhitelister is Errors, UUPSUpgradeable, PausableUpgra
      */
     function addOperator(address operator) external onlyRole(DEFAULT_ADMIN_ROLE) notZeroAddress(operator) {
         grantRole(OPERATOR_ROLE, operator);
+        emit ProtocolAuthorized(operator);
     }
 
     /**
@@ -103,6 +110,7 @@ abstract contract BaseVaultWhitelister is Errors, UUPSUpgradeable, PausableUpgra
      */
     function removeOperator(address operator) external onlyRole(DEFAULT_ADMIN_ROLE) notZeroAddress(operator) {
         revokeRole(OPERATOR_ROLE, operator);
+        emit ProtocolRevoked(operator);
     }
 
     /**
