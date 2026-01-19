@@ -74,6 +74,26 @@ describe('VaultWhitelister', function () {
             const isOperator = await vaultWhitelister.isOperator(protocol2.address);
             expect(isOperator).to.be.false;
         });
+
+        it('should emit ProtocolAuthorized event when adding an operator', async function () {
+            const { vaultWhitelister, admin, protocol2 } = await loadFixture(deployVaultWhitelister);
+
+            await expect(vaultWhitelister.connect(admin).addOperator(protocol2.address))
+                .to.emit(vaultWhitelister, 'ProtocolAuthorized')
+                .withArgs(protocol2.address);
+        });
+
+        it('should emit ProtocolRevoked event when removing an operator', async function () {
+            const { vaultWhitelister, admin, protocol2 } = await loadFixture(deployVaultWhitelister);
+
+            // Grant role first
+            await vaultWhitelister.connect(admin).addOperator(protocol2.address);
+
+            // Then revoke it and verify ProtocolRevoked event
+            await expect(vaultWhitelister.connect(admin).removeOperator(protocol2.address))
+                .to.emit(vaultWhitelister, 'ProtocolRevoked')
+                .withArgs(protocol2.address);
+        });
     });
 
     describe('Whitelist', function () {
