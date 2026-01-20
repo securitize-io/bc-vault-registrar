@@ -1,6 +1,6 @@
 import hre from 'hardhat';
 
-export const deployVaultWhitelister = async () => {
+export const deployWhitelister = async () => {
     const [admin, protocol1, protocol2, investor1, investor2, unauthorized, ...vaults] = await hre.ethers.getSigners();
 
     // Deploy mock registry service
@@ -16,30 +16,30 @@ export const deployVaultWhitelister = async () => {
     ]);
     const dsTokenAddress = await mockDSToken.getAddress();
 
-    // Deploy VaultWhitelister via proxy (initialized by admin)
-    const VaultWhitelister = await hre.ethers.getContractFactory('VaultWhitelister');
-    const vaultWhitelister = await hre.upgrades.deployProxy(VaultWhitelister, [dsTokenAddress], {
+    // Deploy Whitelister via proxy (initialized by admin)
+    const Whitelister = await hre.ethers.getContractFactory('Whitelister');
+    const whitelister = await hre.upgrades.deployProxy(Whitelister, [dsTokenAddress], {
         initializer: 'initialize',
         kind: 'uups',
     });
-    await vaultWhitelister.waitForDeployment();
+    await whitelister.waitForDeployment();
 
     // Deploy MockDeFiProtocol
     const mockDeFiProtocol = await hre.ethers.deployContract('MockDeFiProtocol', [
-        await vaultWhitelister.getAddress(),
+        await whitelister.getAddress(),
         await mockDSToken.getAddress(),
     ]);
     await mockDeFiProtocol.waitForDeployment();
 
     // Grant OPERATOR_ROLE to MockDeFiProtocol (required to call whitelist())
-    await vaultWhitelister.addOperator(await mockDeFiProtocol.getAddress());
+    await whitelister.addOperator(await mockDeFiProtocol.getAddress());
 
     // Grant OPERATOR_ROLE to protocol1 for direct whitelist tests
     // protocol2 is used for tests that verify addOperator, so we don't grant the role here
-    await vaultWhitelister.addOperator(protocol1.address);
+    await whitelister.addOperator(protocol1.address);
 
     return {
-        vaultWhitelister,
+        whitelister,
         mockDSToken,
         mockRegistryService,
         mockDeFiProtocol,

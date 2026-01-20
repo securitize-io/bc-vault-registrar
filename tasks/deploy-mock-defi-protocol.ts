@@ -2,7 +2,7 @@ import { task } from 'hardhat/config';
 import { HardhatRuntimeEnvironment } from 'hardhat/types';
 
 interface DeployMockDeFiProtocolArgs {
-    vaultwhitelister: string;
+    whitelister: string;
     dstoken: string;
     verify?: boolean;
 }
@@ -10,18 +10,18 @@ interface DeployMockDeFiProtocolArgs {
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 task('deploy-mock-defi-protocol', 'Deploys the MockDeFiProtocol contract')
-    .addParam('vaultwhitelister', 'The VaultWhitelister address')
+    .addParam('whitelister', 'The Whitelister address')
     .addParam('dstoken', 'The DSToken address')
     .addFlag('verify', 'Verify the contract on Etherscan')
     .setAction(async (args: DeployMockDeFiProtocolArgs, hre: HardhatRuntimeEnvironment) => {
-        const { vaultwhitelister, dstoken, verify } = args;
+        const { whitelister, dstoken, verify } = args;
 
         console.log('Deploying MockDeFiProtocol...');
-        console.log('VaultWhitelister address:', vaultwhitelister);
+        console.log('Whitelister address:', whitelister);
         console.log('DSToken address:', dstoken);
 
         const mockDeFiProtocol = await hre.ethers.deployContract('MockDeFiProtocol', [
-            vaultwhitelister,
+            whitelister,
             dstoken,
         ]);
 
@@ -41,7 +41,7 @@ task('deploy-mock-defi-protocol', 'Deploys the MockDeFiProtocol contract')
             try {
                 await hre.run('verify:verify', {
                     address: address,
-                    constructorArguments: [vaultwhitelister, dstoken],
+                    constructorArguments: [whitelister, dstoken],
                 });
                 console.log('Contract verified successfully!');
             } catch (error) {

@@ -20,16 +20,16 @@ pragma solidity ^0.8.22;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {BaseVaultWhitelister} from "./BaseVaultWhitelister.sol";
-import {IVaultWhitelister} from "./IVaultWhitelister.sol";
+import {BaseWhitelister} from "./BaseWhitelister.sol";
+import {IWhitelister} from "./IWhitelister.sol";
 import {IDSServiceConsumer} from "./interfaces/IDSServiceConsumer.sol";
 import {IDSRegistryService} from "./interfaces/IDSRegistryService.sol";
 
 /**
- * @title VaultWhitelister
+ * @title Whitelister
  * @dev Allows authorized DeFi protocols to whitelist vault addresses under existing investor identities
  */
-contract VaultWhitelister is IVaultWhitelister, BaseVaultWhitelister {
+contract Whitelister is IWhitelister, BaseWhitelister {
     /// @dev The DSToken address this whitelister is associated with
     address public dsToken;
 
@@ -43,7 +43,7 @@ contract VaultWhitelister is IVaultWhitelister, BaseVaultWhitelister {
      * @param _dsToken The DSToken address
      */
     function initialize(address _dsToken) public initializer notZeroAddress(_dsToken) {
-        __BaseVaultWhitelister_init();
+        __BaseWhitelister_init();
 
         dsToken = _dsToken;
     }
@@ -83,6 +83,6 @@ contract VaultWhitelister is IVaultWhitelister, BaseVaultWhitelister {
         // Register the vault under the investor identity
         registryService.addWallet(vaultAddress, investorId);
 
-        emit VaultWhitelisted(investorWalletAddress, vaultAddress, _dsToken, investorId);
+        emit Whitelisted(investorWalletAddress, vaultAddress, _dsToken, investorId);
     }
 }

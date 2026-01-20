@@ -18,7 +18,7 @@
 
 pragma solidity ^0.8.22;
 
-/// @title MockRegistryService - Test registry service for VaultWhitelister
+/// @title MockRegistryService - Test registry service for Whitelister
 contract MockRegistryService {
     mapping(address => string) private addressToInvestorId;
     mapping(address => bool) private registeredWallets;
@@ -41,7 +41,7 @@ contract MockRegistryService {
         return registeredWallets[_wallet];
     }
 
-    /// @dev Adds a wallet to an investor (called by VaultWhitelister)
+    /// @dev Adds a wallet to an investor (called by Whitelister)
     function addWallet(address _wallet, string memory _investorId) external returns (bool) {
         addressToInvestorId[_wallet] = _investorId;
         registeredWallets[_wallet] = true;

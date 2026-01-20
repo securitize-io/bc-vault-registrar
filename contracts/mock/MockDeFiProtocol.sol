@@ -19,12 +19,12 @@
 pragma solidity ^0.8.22;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IVaultWhitelister} from "../IVaultWhitelister.sol";
+import {IWhitelister} from "../IWhitelister.sol";
 import "./MockVault.sol";
 
 /// @title MockDeFiProtocol - Test DeFi protocol that manages vaults per investor
 contract MockDeFiProtocol {
-    IVaultWhitelister public vaultWhitelister;
+    IWhitelister public whitelister;
     IERC20 public dsToken;
     mapping(address => address) public investorVaults;
 
@@ -32,8 +32,8 @@ contract MockDeFiProtocol {
     event Deposit(address indexed investor, address indexed vault, uint256 amount);
     event Withdraw(address indexed investor, address indexed vault, uint256 amount);
 
-    constructor(address _vaultWhitelister, address _dsToken) {
-        vaultWhitelister = IVaultWhitelister(_vaultWhitelister);
+    constructor(address _whitelister, address _dsToken) {
+        whitelister = IWhitelister(_whitelister);
         dsToken = IERC20(_dsToken);
     }
 
@@ -49,7 +49,7 @@ contract MockDeFiProtocol {
             vault = deployVault();
             investorVaults[msg.sender] = vault;
             // MockDeFiProtocol debe tener OPERATOR_ROLE para llamar whitelist()
-            vaultWhitelister.whitelist(vault, msg.sender);
+            whitelister.whitelist(vault, msg.sender);
             emit VaultCreated(msg.sender, vault);
         }
 
