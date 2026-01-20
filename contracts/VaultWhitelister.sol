@@ -33,16 +33,16 @@ contract VaultWhitelister is IVaultWhitelister, BaseVaultWhitelister {
     /// @dev The DSToken address this whitelister is associated with
     address public dsToken;
 
-    /// @dev Storage gap for future upgrades
-    uint256[49] private __gap;
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
 
     /**
      * @dev Initializes the contract
      * @param _dsToken The DSToken address
      */
-    function initialize(address _dsToken) public initializer {
-        if (_dsToken == address(0)) revert InvalidAddress();
-
+    function initialize(address _dsToken) public initializer notZeroAddress(_dsToken) {
         __BaseVaultWhitelister_init();
 
         dsToken = _dsToken;
@@ -57,9 +57,11 @@ contract VaultWhitelister is IVaultWhitelister, BaseVaultWhitelister {
         address vaultAddress,
         address investorWalletAddress
     ) external whenNotPaused onlyAdminOrOperator notZeroAddress(vaultAddress) notZeroAddress(investorWalletAddress) {
+        address _dsToken = dsToken;
+
         // Get Registry Service
         IDSRegistryService registryService = IDSRegistryService(
-            IDSServiceConsumer(dsToken).getDSService(REGISTRY_SERVICE)
+            IDSServiceConsumer(_dsToken).getDSService(REGISTRY_SERVICE)
         );
 
         // Get investor ID from the investor wallet
@@ -74,13 +76,13 @@ contract VaultWhitelister is IVaultWhitelister, BaseVaultWhitelister {
         }
 
         // Check investor wallet has balance > 0
-        if (IERC20(dsToken).balanceOf(investorWalletAddress) == 0) {
+        if (IERC20(_dsToken).balanceOf(investorWalletAddress) == 0) {
             revert InvestorHasNoBalance(investorWalletAddress);
         }
 
         // Register the vault under the investor identity
         registryService.addWallet(vaultAddress, investorId);
 
-        emit VaultWhitelisted(investorWalletAddress, vaultAddress, dsToken, investorId);
+        emit VaultWhitelisted(investorWalletAddress, vaultAddress, _dsToken, investorId);
     }
 }

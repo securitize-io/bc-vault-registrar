@@ -43,7 +43,7 @@ abstract contract BaseVaultWhitelister is Errors, UUPSUpgradeable, PausableUpgra
     event ProtocolRevoked(address indexed protocol);
 
     /// @dev Storage gap for future upgrades
-    uint256[50] private __gap;
+    uint256[48] private __gap;
 
     /// @dev Modifier to allow only DEFAULT_ADMIN_ROLE or OPERATOR_ROLE
     modifier onlyAdminOrOperator() {
