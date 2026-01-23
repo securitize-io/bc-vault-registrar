@@ -1,16 +1,16 @@
-# Securitize Vault Whitelister
+# Securitize Whitelister Smart Contract
 
 An intermediary contract that allows authorized DeFi protocols to whitelist vault addresses under existing investor identities, maintaining compliance with Securitize's KYC requirements while enabling segregated custody for DeFi use cases.
 
 ## Overview
 
-The Vault Whitelister contract enables authorized protocols (with EXCHANGE role) to register vault addresses under existing investor identities in Securitize's Registry Service. This allows DeFi protocols to operate custody vaults while maintaining full KYC/AML compliance.
+The Whitelister contract enables authorized protocols (with OPERATOR_ROLE) to register vault addresses under existing investor identities in Securitize's Registry Service. This allows DeFi protocols to operate custody vaults while maintaining full KYC/AML compliance.
 
 ## Architecture
 
 ```
 ┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐
-│  DeFi Protocol   │────▶│ VaultWhitelister │────▶│    DSToken       │
+│  DeFi Protocol   │────▶│   Whitelister   │────▶│    DSToken       │
 │ (OPERATOR_ROLE)  │     │                  │     │                  │
 └──────────────────┘     └────────┬─────────┘     └────────┬─────────┘
                                   │                        │
@@ -62,20 +62,20 @@ npm test
 
 ## Deployment
 
-### Deploy VaultWhitelister
+### Deploy Whitelister
 
 ```bash
-npx hardhat deploy-vault-whitelister --dstoken <DSTOKEN_ADDRESS> --network <NETWORK>
+npx hardhat deploy-whitelister --dstoken <DSTOKEN_ADDRESS> --network <NETWORK>
 ```
 
-This will deploy a UUPS upgradeable proxy for the VaultWhitelister contract. The task will output:
+This will deploy a UUPS upgradeable proxy for the Whitelister contract. The task will output:
 - Proxy address
 - Implementation address
 
 ### Deploy MockDeFiProtocol
 
 ```bash
-npx hardhat deploy-mock-defi-protocol --vaultwhitelister <VAULT_WHITELISTER_ADDRESS> --dstoken <DSTOKEN_ADDRESS> --network <NETWORK>
+npx hardhat deploy-mock-defi-protocol --whitelister <WHITELISTER_ADDRESS> --dstoken <DSTOKEN_ADDRESS> --network <NETWORK>
 ```
 
 This will deploy the MockDeFiProtocol contract for testing purposes. The task will output:
@@ -125,7 +125,7 @@ Unpauses the contract (admin only).
 
 ## Events
 
-- `VaultWhitelisted(address indexed investor, address indexed vault, address indexed dsToken, string investorId)`
+- `Whitelisted(address indexed investor, address indexed vault, address indexed dsToken, string investorId)`
 
 The contract also emits standard AccessControl events:
 - `RoleGranted(bytes32 indexed role, address indexed account, address indexed sender)`

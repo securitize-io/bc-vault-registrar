@@ -20,30 +20,30 @@ pragma solidity ^0.8.22;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {BaseVaultWhitelister} from "./BaseVaultWhitelister.sol";
-import {IVaultWhitelister} from "./IVaultWhitelister.sol";
+import {BaseWhitelister} from "./BaseWhitelister.sol";
+import {IWhitelister} from "./IWhitelister.sol";
 import {IDSServiceConsumer} from "./interfaces/IDSServiceConsumer.sol";
 import {IDSRegistryService} from "./interfaces/IDSRegistryService.sol";
 
 /**
- * @title VaultWhitelister
+ * @title Whitelister
  * @dev Allows authorized DeFi protocols to whitelist vault addresses under existing investor identities
  */
-contract VaultWhitelister is IVaultWhitelister, BaseVaultWhitelister {
+contract Whitelister is IWhitelister, BaseWhitelister {
     /// @dev The DSToken address this whitelister is associated with
     address public dsToken;
 
-    /// @dev Storage gap for future upgrades
-    uint256[49] private __gap;
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
 
     /**
      * @dev Initializes the contract
      * @param _dsToken The DSToken address
      */
-    function initialize(address _dsToken) public initializer {
-        if (_dsToken == address(0)) revert InvalidAddress();
-
-        __BaseVaultWhitelister_init();
+    function initialize(address _dsToken) public initializer notZeroAddress(_dsToken) {
+        __BaseWhitelister_init();
 
         dsToken = _dsToken;
     }
@@ -57,9 +57,11 @@ contract VaultWhitelister is IVaultWhitelister, BaseVaultWhitelister {
         address vaultAddress,
         address investorWalletAddress
     ) external whenNotPaused onlyAdminOrOperator notZeroAddress(vaultAddress) notZeroAddress(investorWalletAddress) {
+        address _dsToken = dsToken;
+
         // Get Registry Service
         IDSRegistryService registryService = IDSRegistryService(
-            IDSServiceConsumer(dsToken).getDSService(REGISTRY_SERVICE)
+            IDSServiceConsumer(_dsToken).getDSService(REGISTRY_SERVICE)
         );
 
         // Get investor ID from the investor wallet
@@ -74,13 +76,13 @@ contract VaultWhitelister is IVaultWhitelister, BaseVaultWhitelister {
         }
 
         // Check investor wallet has balance > 0
-        if (IERC20(dsToken).balanceOf(investorWalletAddress) == 0) {
+        if (IERC20(_dsToken).balanceOf(investorWalletAddress) == 0) {
             revert InvestorHasNoBalance(investorWalletAddress);
         }
 
         // Register the vault under the investor identity
         registryService.addWallet(vaultAddress, investorId);
 
-        emit VaultWhitelisted(investorWalletAddress, vaultAddress, dsToken, investorId);
+        emit Whitelisted(investorWalletAddress, vaultAddress, _dsToken, investorId);
     }
 }

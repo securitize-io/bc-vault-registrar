@@ -1,113 +1,113 @@
 import { expect } from 'chai';
 import { loadFixture } from '@nomicfoundation/hardhat-network-helpers';
-import { deployVaultWhitelister } from './fixture';
+import { deployWhitelister } from './fixture';
 
-describe('VaultWhitelister', function () {
+describe('Whitelister', function () {
     const INVESTOR_ID = 'investor-123';
 
     describe('Deployment', function () {
         it('should deploy with correct DSToken address', async function () {
-            const { vaultWhitelister, mockDSToken } = await loadFixture(deployVaultWhitelister);
-            expect(await vaultWhitelister.dsToken()).to.equal(await mockDSToken.getAddress());
+            const { whitelister, mockDSToken } = await loadFixture(deployWhitelister);
+            expect(await whitelister.dsToken()).to.equal(await mockDSToken.getAddress());
         });
 
         it('should set deployer as admin', async function () {
-            const { vaultWhitelister, admin } = await loadFixture(deployVaultWhitelister);
-            const DEFAULT_ADMIN_ROLE = await vaultWhitelister.DEFAULT_ADMIN_ROLE();
-            const hasRole = await vaultWhitelister.hasRole(DEFAULT_ADMIN_ROLE, admin.address);
+            const { whitelister, admin } = await loadFixture(deployWhitelister);
+            const DEFAULT_ADMIN_ROLE = await whitelister.DEFAULT_ADMIN_ROLE();
+            const hasRole = await whitelister.hasRole(DEFAULT_ADMIN_ROLE, admin.address);
             expect(hasRole).to.be.true;
         });
 
         it('should not be paused initially', async function () {
-            const { vaultWhitelister } = await loadFixture(deployVaultWhitelister);
-            expect(await vaultWhitelister.paused()).to.be.false;
+            const { whitelister } = await loadFixture(deployWhitelister);
+            expect(await whitelister.paused()).to.be.false;
         });
     });
 
     describe('Role Management', function () {
         it('should allow admin to grant OPERATOR_ROLE to a protocol', async function () {
-            const { vaultWhitelister, admin, protocol2 } = await loadFixture(deployVaultWhitelister);
-            const OPERATOR_ROLE = await vaultWhitelister.OPERATOR_ROLE();
+            const { whitelister, admin, protocol2 } = await loadFixture(deployWhitelister);
+            const OPERATOR_ROLE = await whitelister.OPERATOR_ROLE();
 
             // Note: protocol2 doesn't have OPERATOR_ROLE yet (only protocol1 has it in fixture)
-            const tx = vaultWhitelister.connect(admin).addOperator(protocol2.address);
+            const tx = whitelister.connect(admin).addOperator(protocol2.address);
             await expect(tx)
-                .to.emit(vaultWhitelister, 'RoleGranted')
+                .to.emit(whitelister, 'RoleGranted')
                 .withArgs(OPERATOR_ROLE, protocol2.address, admin.address);
 
-            const isOperator = await vaultWhitelister.isOperator(protocol2.address);
+            const isOperator = await whitelister.isOperator(protocol2.address);
             expect(isOperator).to.be.true;
         });
 
         it('should revert when granting role to zero address', async function () {
-            const { vaultWhitelister, admin } = await loadFixture(deployVaultWhitelister);
+            const { whitelister, admin } = await loadFixture(deployWhitelister);
             const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
             
-            await expect(vaultWhitelister.connect(admin).addOperator(ZERO_ADDRESS)).to.be.reverted;
+            await expect(whitelister.connect(admin).addOperator(ZERO_ADDRESS)).to.be.reverted;
         });
 
         it('should revert when revoking role from zero address', async function () {
-            const { vaultWhitelister, admin } = await loadFixture(deployVaultWhitelister);
+            const { whitelister, admin } = await loadFixture(deployWhitelister);
             const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
             
-            await expect(vaultWhitelister.connect(admin).removeOperator(ZERO_ADDRESS)).to.be.reverted;
+            await expect(whitelister.connect(admin).removeOperator(ZERO_ADDRESS)).to.be.reverted;
         });
 
         it('should revert when non-admin tries to grant role', async function () {
-            const { vaultWhitelister, protocol2, unauthorized } = await loadFixture(deployVaultWhitelister);
+            const { whitelister, protocol2, unauthorized } = await loadFixture(deployWhitelister);
 
-            await expect(vaultWhitelister.connect(unauthorized).addOperator(protocol2.address)).to.be.reverted;
+            await expect(whitelister.connect(unauthorized).addOperator(protocol2.address)).to.be.reverted;
         });
 
         it('should allow admin to revoke OPERATOR_ROLE from a protocol', async function () {
-            const { vaultWhitelister, admin, protocol2 } = await loadFixture(deployVaultWhitelister);
-            const OPERATOR_ROLE = await vaultWhitelister.OPERATOR_ROLE();
+            const { whitelister, admin, protocol2 } = await loadFixture(deployWhitelister);
+            const OPERATOR_ROLE = await whitelister.OPERATOR_ROLE();
 
             // Grant role first
-            await vaultWhitelister.connect(admin).addOperator(protocol2.address);
+            await whitelister.connect(admin).addOperator(protocol2.address);
 
             // Then revoke it
-            await expect(vaultWhitelister.connect(admin).removeOperator(protocol2.address))
-                .to.emit(vaultWhitelister, 'RoleRevoked')
+            await expect(whitelister.connect(admin).removeOperator(protocol2.address))
+                .to.emit(whitelister, 'RoleRevoked')
                 .withArgs(OPERATOR_ROLE, protocol2.address, admin.address);
 
-            const isOperator = await vaultWhitelister.isOperator(protocol2.address);
+            const isOperator = await whitelister.isOperator(protocol2.address);
             expect(isOperator).to.be.false;
         });
 
         it('should emit ProtocolAuthorized event when adding an operator', async function () {
-            const { vaultWhitelister, admin, protocol2 } = await loadFixture(deployVaultWhitelister);
+            const { whitelister, admin, protocol2 } = await loadFixture(deployWhitelister);
 
-            await expect(vaultWhitelister.connect(admin).addOperator(protocol2.address))
-                .to.emit(vaultWhitelister, 'ProtocolAuthorized')
+            await expect(whitelister.connect(admin).addOperator(protocol2.address))
+                .to.emit(whitelister, 'ProtocolAuthorized')
                 .withArgs(protocol2.address);
         });
 
         it('should emit ProtocolRevoked event when removing an operator', async function () {
-            const { vaultWhitelister, admin, protocol2 } = await loadFixture(deployVaultWhitelister);
+            const { whitelister, admin, protocol2 } = await loadFixture(deployWhitelister);
 
             // Grant role first
-            await vaultWhitelister.connect(admin).addOperator(protocol2.address);
+            await whitelister.connect(admin).addOperator(protocol2.address);
 
             // Then revoke it and verify ProtocolRevoked event
-            await expect(vaultWhitelister.connect(admin).removeOperator(protocol2.address))
-                .to.emit(vaultWhitelister, 'ProtocolRevoked')
+            await expect(whitelister.connect(admin).removeOperator(protocol2.address))
+                .to.emit(whitelister, 'ProtocolRevoked')
                 .withArgs(protocol2.address);
         });
     });
 
     describe('Whitelist', function () {
         it('should whitelist a vault successfully when protocol calls whitelist', async function () {
-            const { vaultWhitelister, mockDSToken, mockRegistryService, protocol1, investor1, vaults } =
-                await loadFixture(deployVaultWhitelister);
+            const { whitelister, mockDSToken, mockRegistryService, protocol1, investor1, vaults } =
+                await loadFixture(deployWhitelister);
 
             // Setup: protocol1 already has OPERATOR_ROLE (from fixture), register investor, mint tokens
             await mockRegistryService.registerInvestor(investor1.address, INVESTOR_ID);
             await mockDSToken.mint(investor1.address, 1000);
 
             // Protocol calls whitelist (firmado por protocol1)
-            await expect(vaultWhitelister.connect(protocol1).whitelist(vaults[0].address, investor1.address))
-                .to.emit(vaultWhitelister, 'VaultWhitelisted')
+            await expect(whitelister.connect(protocol1).whitelist(vaults[0].address, investor1.address))
+                .to.emit(whitelister, 'Whitelisted')
                 .withArgs(investor1.address, vaults[0].address, await mockDSToken.getAddress(), INVESTOR_ID);
 
             // Verify vault is registered
@@ -118,23 +118,23 @@ describe('VaultWhitelister', function () {
         });
 
         it('should revert when caller does not have OPERATOR_ROLE', async function () {
-            const { vaultWhitelister, investor1, vaults, unauthorized } = await loadFixture(deployVaultWhitelister);
+            const { whitelister, investor1, vaults, unauthorized } = await loadFixture(deployWhitelister);
 
-            await expect(vaultWhitelister.connect(unauthorized).whitelist(vaults[0].address, investor1.address)).to.be
+            await expect(whitelister.connect(unauthorized).whitelist(vaults[0].address, investor1.address)).to.be
                 .reverted;
         });
 
         it('should revert when investor is not found', async function () {
-            const { vaultWhitelister, protocol1, investor1, vaults } = await loadFixture(deployVaultWhitelister);
+            const { whitelister, protocol1, investor1, vaults } = await loadFixture(deployWhitelister);
 
             // protocol1 already has OPERATOR_ROLE but investor is not registered
-            await expect(vaultWhitelister.connect(protocol1).whitelist(vaults[0].address, investor1.address)).to.be
+            await expect(whitelister.connect(protocol1).whitelist(vaults[0].address, investor1.address)).to.be
                 .reverted;
         });
 
         it('should revert when vault is already registered', async function () {
-            const { vaultWhitelister, mockDSToken, mockRegistryService, protocol1, investor1, vaults } =
-                await loadFixture(deployVaultWhitelister);
+            const { whitelister, mockDSToken, mockRegistryService, protocol1, investor1, vaults } =
+                await loadFixture(deployWhitelister);
 
             // Setup
             await mockRegistryService.registerInvestor(investor1.address, INVESTOR_ID);
@@ -143,87 +143,87 @@ describe('VaultWhitelister', function () {
             // Register vault directly (simulating already registered)
             await mockRegistryService.registerInvestor(vaults[0].address, 'other-investor');
 
-            await expect(vaultWhitelister.connect(protocol1).whitelist(vaults[0].address, investor1.address)).to.be
+            await expect(whitelister.connect(protocol1).whitelist(vaults[0].address, investor1.address)).to.be
                 .reverted;
         });
 
         it('should revert when investor has no balance', async function () {
-            const { vaultWhitelister, mockRegistryService, protocol1, investor1, vaults } =
-                await loadFixture(deployVaultWhitelister);
+            const { whitelister, mockRegistryService, protocol1, investor1, vaults } =
+                await loadFixture(deployWhitelister);
 
             // Setup: protocol1 has OPERATOR_ROLE, register investor, but NO tokens
             await mockRegistryService.registerInvestor(investor1.address, INVESTOR_ID);
             // No minting - investor has 0 balance
 
-            await expect(vaultWhitelister.connect(protocol1).whitelist(vaults[0].address, investor1.address)).to.be
+            await expect(whitelister.connect(protocol1).whitelist(vaults[0].address, investor1.address)).to.be
                 .reverted;
         });
 
         it('should revert when vault address is zero', async function () {
-            const { vaultWhitelister, protocol1, investor1 } = await loadFixture(deployVaultWhitelister);
+            const { whitelister, protocol1, investor1 } = await loadFixture(deployWhitelister);
 
             await expect(
-                vaultWhitelister
+                whitelister
                     .connect(protocol1)
                     .whitelist('0x0000000000000000000000000000000000000000', investor1.address),
             ).to.be.reverted;
         });
 
         it('should revert when investor address is zero', async function () {
-            const { vaultWhitelister, protocol1, vaults } = await loadFixture(deployVaultWhitelister);
+            const { whitelister, protocol1, vaults } = await loadFixture(deployWhitelister);
 
             await expect(
-                vaultWhitelister
+                whitelister
                     .connect(protocol1)
                     .whitelist(vaults[0].address, '0x0000000000000000000000000000000000000000'),
             ).to.be.reverted;
         });
 
         it('should revert when contract is paused', async function () {
-            const { vaultWhitelister, mockDSToken, mockRegistryService, admin, protocol1, investor1, vaults } =
-                await loadFixture(deployVaultWhitelister);
+            const { whitelister, mockDSToken, mockRegistryService, admin, protocol1, investor1, vaults } =
+                await loadFixture(deployWhitelister);
 
             // Setup
             await mockRegistryService.registerInvestor(investor1.address, INVESTOR_ID);
             await mockDSToken.mint(investor1.address, 1000);
 
             // Pause (firmado por admin)
-            await vaultWhitelister.connect(admin).pause();
+            await whitelister.connect(admin).pause();
 
-            await expect(vaultWhitelister.connect(protocol1).whitelist(vaults[0].address, investor1.address)).to.be
+            await expect(whitelister.connect(protocol1).whitelist(vaults[0].address, investor1.address)).to.be
                 .reverted;
         });
     });
 
     describe('Pause/Unpause', function () {
         it('should allow admin to pause', async function () {
-            const { vaultWhitelister, admin } = await loadFixture(deployVaultWhitelister);
+            const { whitelister, admin } = await loadFixture(deployWhitelister);
 
-            await vaultWhitelister.connect(admin).pause();
-            const isPaused = await vaultWhitelister.paused();
+            await whitelister.connect(admin).pause();
+            const isPaused = await whitelister.paused();
             expect(isPaused).to.be.true;
         });
 
         it('should allow admin to unpause', async function () {
-            const { vaultWhitelister, admin } = await loadFixture(deployVaultWhitelister);
+            const { whitelister, admin } = await loadFixture(deployWhitelister);
 
-            await vaultWhitelister.connect(admin).pause();
-            await vaultWhitelister.connect(admin).unpause();
-            const isPaused = await vaultWhitelister.paused();
+            await whitelister.connect(admin).pause();
+            await whitelister.connect(admin).unpause();
+            const isPaused = await whitelister.paused();
             expect(isPaused).to.be.false;
         });
 
         it('should revert when non-admin tries to pause', async function () {
-            const { vaultWhitelister, unauthorized } = await loadFixture(deployVaultWhitelister);
+            const { whitelister, unauthorized } = await loadFixture(deployWhitelister);
 
-            await expect(vaultWhitelister.connect(unauthorized).pause()).to.be.reverted;
+            await expect(whitelister.connect(unauthorized).pause()).to.be.reverted;
         });
     });
 
     describe('DeFi Protocol Integration', function () {
         it('should create and whitelist vault on first deposit', async function () {
-            const { vaultWhitelister, mockDeFiProtocol, mockDSToken, mockRegistryService, investor1 } =
-                await loadFixture(deployVaultWhitelister);
+            const { whitelister, mockDeFiProtocol, mockDSToken, mockRegistryService, investor1 } =
+                await loadFixture(deployWhitelister);
 
             // Setup: registrar inversor y mint tokens
             await mockRegistryService.registerInvestor(investor1.address, INVESTOR_ID);
@@ -241,7 +241,7 @@ describe('VaultWhitelister', function () {
             
             // Verificar el evento con los valores correctos
             await expect(tx)
-                .to.emit(vaultWhitelister, 'VaultWhitelisted')
+                .to.emit(whitelister, 'Whitelisted')
                 .withArgs(
                     investor1.address,
                     vaultAddress,
@@ -255,8 +255,8 @@ describe('VaultWhitelister', function () {
         });
 
         it('should deposit to existing vault without whitelisting again', async function () {
-            const { vaultWhitelister, mockDeFiProtocol, mockDSToken, mockRegistryService, investor1 } =
-                await loadFixture(deployVaultWhitelister);
+            const { whitelister, mockDeFiProtocol, mockDSToken, mockRegistryService, investor1 } =
+                await loadFixture(deployWhitelister);
 
             // Setup: registrar inversor y mint tokens
             await mockRegistryService.registerInvestor(investor1.address, INVESTOR_ID);
@@ -280,7 +280,7 @@ describe('VaultWhitelister', function () {
         });
 
         it('should revert deposit when investor is not registered', async function () {
-            const { mockDeFiProtocol, mockDSToken, investor2 } = await loadFixture(deployVaultWhitelister);
+            const { mockDeFiProtocol, mockDSToken, investor2 } = await loadFixture(deployWhitelister);
 
             // Mint tokens but don't register investor
             await mockDSToken.mint(investor2.address, 1000);
@@ -291,7 +291,7 @@ describe('VaultWhitelister', function () {
         });
 
         it('should revert deposit when investor has no balance', async function () {
-            const { mockDeFiProtocol, mockRegistryService, investor2 } = await loadFixture(deployVaultWhitelister);
+            const { mockDeFiProtocol, mockRegistryService, investor2 } = await loadFixture(deployWhitelister);
 
             // Register investor but don't mint tokens
             await mockRegistryService.registerInvestor(investor2.address, 'investor-456');
@@ -301,8 +301,8 @@ describe('VaultWhitelister', function () {
         });
 
         it('should revert deposit when contract is paused', async function () {
-            const { vaultWhitelister, mockDeFiProtocol, mockDSToken, mockRegistryService, admin, investor1 } =
-                await loadFixture(deployVaultWhitelister);
+            const { whitelister, mockDeFiProtocol, mockDSToken, mockRegistryService, admin, investor1 } =
+                await loadFixture(deployWhitelister);
 
             // Setup
             await mockRegistryService.registerInvestor(investor1.address, INVESTOR_ID);
@@ -310,7 +310,7 @@ describe('VaultWhitelister', function () {
             await mockDSToken.connect(investor1).approve(await mockDeFiProtocol.getAddress(), 1000);
 
             // Pause (firmado por admin)
-            await vaultWhitelister.connect(admin).pause();
+            await whitelister.connect(admin).pause();
 
             // Deposit should fail when paused
             await expect(mockDeFiProtocol.connect(investor1).deposit(1000)).to.be.reverted;
@@ -318,7 +318,7 @@ describe('VaultWhitelister', function () {
 
         it('should handle multiple investors depositing', async function () {
             const { mockDeFiProtocol, mockDSToken, mockRegistryService, investor1, investor2 } =
-                await loadFixture(deployVaultWhitelister);
+                await loadFixture(deployWhitelister);
 
             // Setup both investors
             await mockRegistryService.registerInvestor(investor1.address, INVESTOR_ID);
@@ -345,16 +345,16 @@ describe('VaultWhitelister', function () {
 
     describe('Upgradability', function () {
         it('should return implementation address', async function () {
-            const { vaultWhitelister } = await loadFixture(deployVaultWhitelister);
+            const { whitelister } = await loadFixture(deployWhitelister);
 
-            const implAddress = await vaultWhitelister.getImplementationAddress();
+            const implAddress = await whitelister.getImplementationAddress();
             expect(implAddress).to.not.equal('0x0000000000000000000000000000000000000000');
         });
 
         it('should return initialized version', async function () {
-            const { vaultWhitelister } = await loadFixture(deployVaultWhitelister);
+            const { whitelister } = await loadFixture(deployWhitelister);
 
-            const version = await vaultWhitelister.getInitializedVersion();
+            const version = await whitelister.getInitializedVersion();
             expect(version).to.equal(1);
         });
     });

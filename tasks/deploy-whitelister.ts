@@ -1,35 +1,35 @@
 import { task } from 'hardhat/config';
 import { HardhatRuntimeEnvironment } from 'hardhat/types';
 
-interface DeployVaultWhitelisterArgs {
+interface DeployWhitelisterArgs {
     dstoken: string;
     verify?: boolean;
 }
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-task('deploy-vault-whitelister', 'Deploys the VaultWhitelister contract')
+task('deploy-whitelister', 'Deploys the Whitelister contract')
     .addParam('dstoken', 'The DSToken address')
     .addFlag('verify', 'Verify the contract on Etherscan')
-    .setAction(async (args: DeployVaultWhitelisterArgs, hre: HardhatRuntimeEnvironment) => {
+    .setAction(async (args: DeployWhitelisterArgs, hre: HardhatRuntimeEnvironment) => {
         const { dstoken, verify } = args;
 
-        console.log('Deploying VaultWhitelister...');
+        console.log('Deploying Whitelister...');
         console.log('DSToken address:', dstoken);
 
-        const VaultWhitelister = await hre.ethers.getContractFactory('VaultWhitelister');
+        const Whitelister = await hre.ethers.getContractFactory('Whitelister');
 
-        const vaultWhitelister = await hre.upgrades.deployProxy(VaultWhitelister, [dstoken], {
+        const whitelister = await hre.upgrades.deployProxy(Whitelister, [dstoken], {
             initializer: 'initialize',
             kind: 'uups',
         });
 
-        await vaultWhitelister.waitForDeployment();
+        await whitelister.waitForDeployment();
 
-        const proxyAddress = await vaultWhitelister.getAddress();
-        const implementationAddress = await vaultWhitelister.getImplementationAddress();
+        const proxyAddress = await whitelister.getAddress();
+        const implementationAddress = await whitelister.getImplementationAddress();
 
-        console.log('VaultWhitelister deployed successfully!');
+        console.log('Whitelister deployed successfully!');
         console.log('Proxy address:', proxyAddress);
         console.log('Implementation address:', implementationAddress);
 
@@ -37,7 +37,7 @@ task('deploy-vault-whitelister', 'Deploys the VaultWhitelister contract')
             console.log('\nWaiting 40 seconds before verifying...');
             await delay(40000);
 
-            console.log(`Verifying VaultWhitelister implementation at ${implementationAddress} on ${hre.network.name}...`);
+            console.log(`Verifying Whitelister implementation at ${implementationAddress} on ${hre.network.name}...`);
 
             try {
                 await hre.run('verify:verify', {
@@ -46,12 +46,12 @@ task('deploy-vault-whitelister', 'Deploys the VaultWhitelister contract')
                 });
                 console.log('Contract verified successfully!');
             } catch (error) {
-                console.error(`Verification failed for VaultWhitelister at ${implementationAddress}:`, error);
+                console.error(`Verification failed for Whitelister at ${implementationAddress}:`, error);
             }
         }
 
         return {
-            vaultWhitelister,
+            whitelister,
             proxyAddress,
             implementationAddress,
         };

@@ -21,10 +21,10 @@ pragma solidity ^0.8.22;
 import {Errors} from "./Errors.sol";
 
 /**
- * @title IVaultWhitelister
- * @dev Interface for the VaultWhitelister contract
+ * @title IWhitelister
+ * @dev Interface for the Whitelister contract
  */
-interface IVaultWhitelister is Errors {
+interface IWhitelister is Errors {
     /**
      * @dev Emitted when a vault is whitelisted under an investor identity
      * @param investor The investor wallet address
@@ -32,7 +32,7 @@ interface IVaultWhitelister is Errors {
      * @param dsToken The DSToken address
      * @param investorId The investor ID
      */
-    event VaultWhitelisted(address indexed investor, address indexed vault, address indexed dsToken, string investorId);
+    event Whitelisted(address indexed investor, address indexed vault, address indexed dsToken, string investorId);
 
     /**
      * @dev Whitelists a vault address under an existing investor identity
