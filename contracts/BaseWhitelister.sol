@@ -100,8 +100,9 @@ abstract contract BaseWhitelister is Errors, UUPSUpgradeable, PausableUpgradeabl
      * @param operator Address to grant operator role
      */
     function addOperator(address operator) external onlyRole(DEFAULT_ADMIN_ROLE) notZeroAddress(operator) {
-        grantRole(OPERATOR_ROLE, operator);
-        emit ProtocolAuthorized(operator);
+        if (_grantRole(OPERATOR_ROLE, operator)) {
+            emit ProtocolAuthorized(operator);
+        }
     }
 
     /**
@@ -109,8 +110,9 @@ abstract contract BaseWhitelister is Errors, UUPSUpgradeable, PausableUpgradeabl
      * @param operator Address to revoke operator role
      */
     function removeOperator(address operator) external onlyRole(DEFAULT_ADMIN_ROLE) notZeroAddress(operator) {
-        revokeRole(OPERATOR_ROLE, operator);
-        emit ProtocolRevoked(operator);
+        if (_revokeRole(OPERATOR_ROLE, operator)) {
+            emit ProtocolRevoked(operator);
+        }
     }
 
     /**

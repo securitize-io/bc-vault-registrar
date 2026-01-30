@@ -83,6 +83,21 @@ describe('Whitelister', function () {
                 .withArgs(protocol2.address);
         });
 
+        it('should not emit ProtocolAuthorized when adding an operator that already has the role', async function () {
+            const { whitelister, admin, protocol2 } = await loadFixture(deployWhitelister);
+
+            // Grant role first time - should emit event
+            await whitelister.connect(admin).addOperator(protocol2.address);
+
+            // Grant role second time - should NOT emit event
+            const tx = whitelister.connect(admin).addOperator(protocol2.address);
+            await expect(tx).to.not.emit(whitelister, 'ProtocolAuthorized');
+
+            // Verify role is still granted
+            const isOperator = await whitelister.isOperator(protocol2.address);
+            expect(isOperator).to.be.true;
+        });
+
         it('should emit ProtocolRevoked event when removing an operator', async function () {
             const { whitelister, admin, protocol2 } = await loadFixture(deployWhitelister);
 
@@ -93,6 +108,22 @@ describe('Whitelister', function () {
             await expect(whitelister.connect(admin).removeOperator(protocol2.address))
                 .to.emit(whitelister, 'ProtocolRevoked')
                 .withArgs(protocol2.address);
+        });
+
+        it('should not emit ProtocolRevoked when removing an operator that does not have the role', async function () {
+            const { whitelister, admin, protocol2 } = await loadFixture(deployWhitelister);
+
+            // Verify protocol2 doesn't have the role initially
+            const isOperatorBefore = await whitelister.isOperator(protocol2.address);
+            expect(isOperatorBefore).to.be.false;
+
+            // Try to remove role - should NOT emit event
+            const tx = whitelister.connect(admin).removeOperator(protocol2.address);
+            await expect(tx).to.not.emit(whitelister, 'ProtocolRevoked');
+
+            // Verify role is still not granted
+            const isOperatorAfter = await whitelister.isOperator(protocol2.address);
+            expect(isOperatorAfter).to.be.false;
         });
     });
 
