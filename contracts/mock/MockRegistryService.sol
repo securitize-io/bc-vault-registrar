@@ -48,19 +48,4 @@ contract MockRegistryService {
         emit WalletAdded(_wallet, _investorId);
         return true;
     }
-
-    /// @dev Removes a wallet from an investor (called by VaultRegistrar)
-    function removeWallet(address _wallet, string memory _investorId) external returns (bool) {
-        require(registeredWallets[_wallet], "Wallet not registered");
-        require(
-            keccak256(bytes(addressToInvestorId[_wallet])) == keccak256(bytes(_investorId)),
-            "Wallet does not belong to investor"
-        );
-        delete addressToInvestorId[_wallet];
-        registeredWallets[_wallet] = false;
-        emit WalletRemoved(_wallet, _investorId);
-        return true;
-    }
-
-    event WalletRemoved(address indexed wallet, string investorId);
 }
