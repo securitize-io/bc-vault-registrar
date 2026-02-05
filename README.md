@@ -1,16 +1,16 @@
-# Securitize Whitelister Smart Contract
+# Securitize VaultRegistrar Smart Contract
 
-An intermediary contract that allows authorized DeFi protocols to whitelist vault addresses under existing investor identities, maintaining compliance with Securitize's KYC requirements while enabling segregated custody for DeFi use cases.
+An intermediary contract that allows authorized DeFi protocols to register vault addresses under existing investor identities, maintaining compliance with Securitize's KYC requirements while enabling segregated custody for DeFi use cases.
 
 ## Overview
 
-The Whitelister contract enables authorized protocols (with OPERATOR_ROLE) to register vault addresses under existing investor identities in Securitize's Registry Service. This allows DeFi protocols to operate custody vaults while maintaining full KYC/AML compliance.
+The VaultRegistrar contract enables authorized protocols (with OPERATOR_ROLE) to register vault addresses under existing investor identities in Securitize's Registry Service. This allows DeFi protocols to operate custody vaults while maintaining full KYC/AML compliance.
 
 ## Architecture
 
 ```
 ┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐
-│  DeFi Protocol   │────▶│   Whitelister   │────▶│    DSToken       │
+│  DeFi Protocol   │────▶│  VaultRegistrar │────▶│    DSToken       │
 │ (OPERATOR_ROLE)  │     │                  │     │                  │
 └──────────────────┘     └────────┬─────────┘     └────────┬─────────┘
                                   │                        │
@@ -29,9 +29,9 @@ The Whitelister contract enables authorized protocols (with OPERATOR_ROLE) to re
 
 ## Features
 
-- **One DSToken per Whitelister**: Each deployment is tied to a specific DSToken
+- **One DSToken per VaultRegistrar**: Each deployment is tied to a specific DSToken
 - **Role-Based Access Control**: Uses OpenZeppelin's AccessControl for managing operators
-- **OPERATOR_ROLE**: Protocols with OPERATOR_ROLE can whitelist vaults
+- **OPERATOR_ROLE**: Protocols with OPERATOR_ROLE can register vaults
 - **Investor Verification**: Validates investor exists and has token balance
 - **Vault Registration**: Registers vault addresses under investor identities
 - **Pausable**: Contract can be paused by admin for emergency situations
@@ -62,20 +62,20 @@ npm test
 
 ## Deployment
 
-### Deploy Whitelister
+### Deploy VaultRegistrar
 
 ```bash
-npx hardhat deploy-whitelister --dstoken <DSTOKEN_ADDRESS> --network <NETWORK>
+npx hardhat deploy-vault-registrar --dstoken <DSTOKEN_ADDRESS> --network <NETWORK>
 ```
 
-This will deploy a UUPS upgradeable proxy for the Whitelister contract. The task will output:
+This will deploy a UUPS upgradeable proxy for the VaultRegistrar contract. The task will output:
 - Proxy address
 - Implementation address
 
 ### Deploy MockDeFiProtocol
 
 ```bash
-npx hardhat deploy-mock-defi-protocol --whitelister <WHITELISTER_ADDRESS> --dstoken <DSTOKEN_ADDRESS> --network <NETWORK>
+npx hardhat deploy-mock-defi-protocol --vaultRegistrar <VAULT_REGISTRAR_ADDRESS> --dstoken <DSTOKEN_ADDRESS> --network <NETWORK>
 ```
 
 This will deploy the MockDeFiProtocol contract for testing purposes. The task will output:
@@ -83,10 +83,10 @@ This will deploy the MockDeFiProtocol contract for testing purposes. The task wi
 
 ## Contract Functions
 
-### `initialize(address _dsToken)`
-Initializes the contract with the DSToken address.
+### `initialize(address _token)`
+Initializes the contract with the token address.
 
-### `whitelist(address vaultAddress, address investorWalletAddress)`
+### `registerVault(address vaultAddress, address investorWalletAddress)`
 Registers a vault address under an existing investor identity.
 
 **Requirements:**
@@ -96,6 +96,28 @@ Registers a vault address under an existing investor identity.
 - Investor wallet must have balance > 0
 - Contract must not be paused
 - Both addresses must not be zero address
+
+### `isRegistered(address vaultAddress, address investorWalletAddress)`
+Checks if a vault is registered for an investor.
+
+**Returns:**
+- `bool`: `true` if the vault is registered for the investor, `false` otherwise
+
+**Requirements:**
+- View function (no state changes)
+- Both addresses must be valid (non-zero)
+
+### `unregisterVault(address vaultAddress, address investorWalletAddress)`
+Revokes the registration of a vault address.
+
+**Requirements:**
+- Currently reverts with `NotImplemented` error (not yet implemented)
+
+### `token()`
+Returns the token address associated with this vault registrar.
+
+**Returns:**
+- `address`: The token address
 
 ### `addOperator(address operator)`
 Grants OPERATOR_ROLE to an address (admin only).
@@ -125,7 +147,12 @@ Unpauses the contract (admin only).
 
 ## Events
 
-- `Whitelisted(address indexed investor, address indexed vault, address indexed dsToken, string investorId)`
+- `VaultRegistered(address indexed investor, address indexed vault, address token, string investorId, address indexed sender)`
+  - Emitted when a vault is successfully registered for an investor
+  - `sender` is the address that called the `registerVault()` function
+
+- `VaultUnregistered(address indexed investor, address indexed vault, address token, string investorId, address indexed sender)`
+  - Emitted when a vault registration is revoked
 
 The contract also emits standard AccessControl events:
 - `RoleGranted(bytes32 indexed role, address indexed account, address indexed sender)`

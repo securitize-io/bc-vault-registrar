@@ -1,2 +1,2 @@
-import './deploy-whitelister';
+import './deploy-vault-registrar';
 import './deploy-mock-defi-protocol';

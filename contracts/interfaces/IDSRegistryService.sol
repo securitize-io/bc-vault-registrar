@@ -44,4 +44,12 @@ interface IDSRegistryService {
      * @return True if successful
      */
     function addWallet(address _address, string memory _id) external returns (bool);
+
+    /**
+     * @dev Removes a wallet from an investor
+     * @param _address The wallet address to remove
+     * @param _id The investor ID
+     * @return True if successful
+     */
+    function removeWallet(address _address, string memory _id) external returns (bool);
 }
