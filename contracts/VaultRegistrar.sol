@@ -87,9 +87,11 @@ contract VaultRegistrar is IVaultRegistrar, BaseVaultRegistrar {
             revert InvestorNotFound(investorWalletAddress);
         }
 
-        // Check if vault is already registered
-        if (registryService.isWallet(vaultAddress)) {
-            // Check if it belongs to a different investor
+        // Check if vault is already registered - if getInvestor returns non-empty, vault is registered
+        string memory vaultInvestorId = registryService.getInvestor(vaultAddress);
+        if (bytes(vaultInvestorId).length > 0) {
+            // Vault is registered - validate it belongs to the same investor
+            // If different, revert with specific error; if same, revert with already registered
             _validateVaultBelongsToInvestor(registryService, vaultAddress, investorId);
             
             // If it belongs to the same investor, it's already registered
@@ -122,24 +124,20 @@ contract VaultRegistrar is IVaultRegistrar, BaseVaultRegistrar {
             IDSServiceConsumer(token).getDSService(REGISTRY_SERVICE)
         );
 
-        // Check if vault is registered as wallet
-        if (!registryService.isWallet(vaultAddress)) {
-            return false;
-        }
-
-        // Get investor ID from vault
+        // Get investor ID from vault - if empty, vault is not registered
         string memory vaultInvestorId = registryService.getInvestor(vaultAddress);
         if (bytes(vaultInvestorId).length == 0) {
             return false;
         }
 
-        // Get investor ID from investor wallet
+        // Get investor ID from investor wallet - if empty, investor is not registered
         string memory investorId = registryService.getInvestor(investorWalletAddress);
         if (bytes(investorId).length == 0) {
             return false;
         }
 
-        // Compare investor IDs - if different, revert with specific error
+        // Vault is registered - validate it belongs to the same investor
+        // If different, revert with specific error
         _validateVaultBelongsToInvestor(registryService, vaultAddress, investorId);
 
         return true;

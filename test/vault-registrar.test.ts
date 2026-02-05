@@ -142,8 +142,6 @@ describe('VaultRegistrar', function () {
                 .withArgs(investor1.address, vaults[0].address, await mockDSToken.getAddress(), INVESTOR_ID, protocol1.address);
 
             // Verify vault is registered
-            const isWallet = await mockRegistryService.isWallet(vaults[0].address);
-            expect(isWallet).to.be.true;
             const investorId = await mockRegistryService.getInvestor(vaults[0].address);
             expect(investorId).to.equal(INVESTOR_ID);
         });
