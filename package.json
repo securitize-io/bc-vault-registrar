@@ -1,7 +1,7 @@
 {
-    "name": "@securitize/bc-whitelister-sc",
+    "name": "@securitize/bc-vault-registrar-sc",
     "version": "0.0.1",
-    "description": "Securitize Whitelister Smart Contract - Whitelist vault addresses under existing investor identities",
+    "description": "Securitize VaultRegistrar Smart Contract - Register vault addresses under existing investor identities",
     "license": "Apache-2.0",
     "scripts": {
         "test": "hardhat test",

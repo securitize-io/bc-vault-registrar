@@ -31,13 +31,6 @@ interface IDSRegistryService {
     function getInvestor(address _address) external view returns (string memory);
 
     /**
-     * @dev Checks if an address is a registered wallet
-     * @param _address The address to check
-     * @return True if the address is a registered wallet
-     */
-    function isWallet(address _address) external view returns (bool);
-
-    /**
      * @dev Adds a wallet to an investor
      * @param _address The wallet address to add
      * @param _id The investor ID

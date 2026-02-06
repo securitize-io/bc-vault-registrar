@@ -34,4 +34,12 @@ interface Errors {
     /// @notice Thrown when an invalid address (zero address) is provided
     /// @dev Selector: 0xe6c4247b
     error InvalidAddress();
+
+    /// @notice Thrown when a vault belongs to a different investor
+    /// @dev Selector: 0x8df63830
+    error VaultBelongsToDifferentInvestor(address vault, string vaultInvestorId);
+
+    /// @notice Thrown when a function is not implemented
+    /// @dev Selector: 0xd6234725
+    error NotImplemented();
 }

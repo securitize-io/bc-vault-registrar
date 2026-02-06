@@ -20,7 +20,7 @@ pragma solidity ^0.8.22;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-/// @title MockDSToken - Test token contract for Whitelister
+/// @title MockDSToken - Test token contract for VaultRegistrar
 contract MockDSToken is ERC20 {
     /// @dev Service ID constants
     uint256 public constant REGISTRY_SERVICE = 4;

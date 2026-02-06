@@ -18,17 +18,15 @@
 
 pragma solidity ^0.8.22;
 
-/// @title MockRegistryService - Test registry service for Whitelister
+/// @title MockRegistryService - Test registry service for VaultRegistrar
 contract MockRegistryService {
     mapping(address => string) private addressToInvestorId;
-    mapping(address => bool) private registeredWallets;
 
     event WalletAdded(address indexed wallet, string investorId);
 
     /// @dev Registers an investor with a wallet
     function registerInvestor(address _wallet, string calldata _investorId) external {
         addressToInvestorId[_wallet] = _investorId;
-        registeredWallets[_wallet] = true;
     }
 
     /// @dev Gets the investor ID for a wallet
@@ -36,15 +34,9 @@ contract MockRegistryService {
         return addressToInvestorId[_wallet];
     }
 
-    /// @dev Checks if an address is a registered wallet
-    function isWallet(address _wallet) external view returns (bool) {
-        return registeredWallets[_wallet];
-    }
-
-    /// @dev Adds a wallet to an investor (called by Whitelister)
+    /// @dev Adds a wallet to an investor (called by VaultRegistrar)
     function addWallet(address _wallet, string memory _investorId) external returns (bool) {
         addressToInvestorId[_wallet] = _investorId;
-        registeredWallets[_wallet] = true;
         emit WalletAdded(_wallet, _investorId);
         return true;
     }
