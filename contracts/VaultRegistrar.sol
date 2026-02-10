@@ -49,17 +49,17 @@ contract VaultRegistrar is IVaultRegistrar, BaseVaultRegistrar {
     }
 
     /**
-     * @dev Validates that a vault belongs to the expected investor, reverts if it belongs to a different investor
-     * @param registryService The registry service instance
-     * @param vaultAddress The vault address to check
-     * @param expectedInvestorId The expected investor ID
+     * @dev Validates that a vault belongs to the expected investor by comparing investor IDs
+     * @param vaultAddress The address of the vault to validate
+     * @param vaultInvestorId The investor ID associated with the vault
+     * @param expectedInvestorId The expected investor ID that the vault should belong to
+     * @notice Reverts with VaultBelongsToDifferentInvestor if the vault belongs to a different investor
      */
     function _validateVaultBelongsToInvestor(
-        IDSRegistryService registryService,
         address vaultAddress,
+        string memory vaultInvestorId,
         string memory expectedInvestorId
-    ) private view {
-        string memory vaultInvestorId = registryService.getInvestor(vaultAddress);
+    ) private pure {
         if (keccak256(bytes(vaultInvestorId)) != keccak256(bytes(expectedInvestorId))) {
             revert VaultBelongsToDifferentInvestor(vaultAddress, vaultInvestorId);
         }
@@ -92,8 +92,8 @@ contract VaultRegistrar is IVaultRegistrar, BaseVaultRegistrar {
         if (bytes(vaultInvestorId).length > 0) {
             // Vault is registered - validate it belongs to the same investor
             // If different, revert with specific error; if same, revert with already registered
-            _validateVaultBelongsToInvestor(registryService, vaultAddress, investorId);
-            
+            _validateVaultBelongsToInvestor(vaultAddress, vaultInvestorId, investorId);
+
             // If it belongs to the same investor, it's already registered
             revert VaultAlreadyRegistered(vaultAddress);
         }
@@ -138,7 +138,7 @@ contract VaultRegistrar is IVaultRegistrar, BaseVaultRegistrar {
 
         // Vault is registered - validate it belongs to the same investor
         // If different, revert with specific error
-        _validateVaultBelongsToInvestor(registryService, vaultAddress, investorId);
+        _validateVaultBelongsToInvestor( vaultAddress, vaultInvestorId, investorId);
 
         return true;
     }
