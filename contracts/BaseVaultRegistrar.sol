@@ -26,14 +26,14 @@ import {ERC1967Utils} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Utils.s
 import {Errors} from "./Errors.sol";
 
 /**
- * @title BaseWhitelister
- * @dev Abstract base contract with common functionality for vault whitelister contracts
+ * @title BaseVaultRegistrar
+ * @dev Abstract base contract with common functionality for vault registrar contracts
  */
-abstract contract BaseWhitelister is Errors, UUPSUpgradeable, PausableUpgradeable, AccessControlUpgradeable {
+abstract contract BaseVaultRegistrar is Errors, UUPSUpgradeable, PausableUpgradeable, AccessControlUpgradeable {
     /// @dev Service ID for Registry Service in DSToken
     uint256 public constant REGISTRY_SERVICE = 4;
 
-    /// @dev Role for operators who can call whitelist
+    /// @dev Role for operators who can call register vault
     bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
 
     /// @dev Emitted when a protocol is authorized as an operator
@@ -69,7 +69,7 @@ abstract contract BaseWhitelister is Errors, UUPSUpgradeable, PausableUpgradeabl
     /**
      * @dev Initializes the base contract
      */
-    function __BaseWhitelister_init() internal onlyInitializing {
+    function __BaseVaultRegistrar_init() internal onlyInitializing {
         __UUPSUpgradeable_init();
         __Pausable_init();
         __AccessControl_init();
