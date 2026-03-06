@@ -16,9 +16,9 @@
  * limitations under the License.
  */
 
-pragma solidity ^0.8.22;
+pragma solidity ^0.8.24;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SignatureChecker} from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
 
 import {BaseVaultRegistrar} from "./BaseVaultRegistrar.sol";
 import {IVaultRegistrar} from "./IVaultRegistrar.sol";
@@ -30,6 +30,12 @@ import {IDSRegistryService} from "./interfaces/IDSRegistryService.sol";
  * @dev Allows authorized DeFi protocols to register vault addresses under existing investor identities
  */
 contract VaultRegistrar is IVaultRegistrar, BaseVaultRegistrar {
+    /// @dev EIP-712 typehash for the RegisterVault struct
+    bytes32 private constant REGISTER_TYPEHASH =
+        keccak256(
+            "RegisterVault(address investor,address operator,address token,uint256 nonce,uint256 deadline)"
+        );
+
     /// @dev The token address this vault registrar is associated with
     address public token;
 
@@ -49,23 +55,6 @@ contract VaultRegistrar is IVaultRegistrar, BaseVaultRegistrar {
     }
 
     /**
-     * @dev Validates that a vault belongs to the expected investor by comparing investor IDs
-     * @param vaultAddress The address of the vault to validate
-     * @param vaultInvestorId The investor ID associated with the vault
-     * @param expectedInvestorId The expected investor ID that the vault should belong to
-     * @notice Reverts with VaultBelongsToDifferentInvestor if the vault belongs to a different investor
-     */
-    function _validateVaultBelongsToInvestor(
-        address vaultAddress,
-        string memory vaultInvestorId,
-        string memory expectedInvestorId
-    ) private pure {
-        if (keccak256(bytes(vaultInvestorId)) != keccak256(bytes(expectedInvestorId))) {
-            revert VaultBelongsToDifferentInvestor(vaultAddress, vaultInvestorId);
-        }
-    }
-
-    /**
      * @dev Registers a vault address under an existing investor identity
      * @param vaultAddress The vault address to register
      * @param investorWalletAddress The investor's wallet address
@@ -73,40 +62,45 @@ contract VaultRegistrar is IVaultRegistrar, BaseVaultRegistrar {
     function registerVault(
         address vaultAddress,
         address investorWalletAddress
-    ) external whenNotPaused onlyAdminOrOperator notZeroAddress(vaultAddress) notZeroAddress(investorWalletAddress) {
-        address _token = token;
+    ) external whenNotPaused onlyRole(OPERATOR_ROLE) notZeroAddress(vaultAddress) notZeroAddress(investorWalletAddress) {
+        _registerVaultInternal(vaultAddress, investorWalletAddress);
+    }
 
-        // Get Registry Service
-        IDSRegistryService registryService = IDSRegistryService(
-            IDSServiceConsumer(_token).getDSService(REGISTRY_SERVICE)
+    /**
+     * @dev Registers a vault with explicit investor consent via EIP-712 signature
+     * @param vaultAddress The vault address to register
+     * @param investorWalletAddress The investor's wallet address (signer)
+     * @param deadline Unix timestamp after which the signature is invalid
+     * @param signature EIP-712 signature — supports EOA (ECDSA) and smart contract wallets (ERC-1271)
+     */
+    function registerVaultWithSig(
+        address vaultAddress,
+        address investorWalletAddress,
+        uint256 deadline,
+        bytes calldata signature
+    ) external whenNotPaused onlyRole(OPERATOR_ROLE) notZeroAddress(vaultAddress) notZeroAddress(investorWalletAddress) {
+        if (block.timestamp > deadline) revert SignatureExpired();
+
+        bytes32 digest = _hashTypedDataV4(
+            keccak256(
+                abi.encode(
+                    REGISTER_TYPEHASH,
+                    investorWalletAddress,
+                    _msgSender(),
+                    token,
+                    nonces(investorWalletAddress),
+                    deadline
+                )
+            )
         );
 
-        // Get investor ID from the investor wallet
-        string memory investorId = registryService.getInvestor(investorWalletAddress);
-        if (bytes(investorId).length == 0) {
-            revert InvestorNotFound(investorWalletAddress);
+        if (!SignatureChecker.isValidSignatureNow(investorWalletAddress, digest, signature)) {
+            revert InvalidInvestorSignature();
         }
 
-        // Check if vault is already registered - if getInvestor returns non-empty, vault is registered
-        string memory vaultInvestorId = registryService.getInvestor(vaultAddress);
-        if (bytes(vaultInvestorId).length > 0) {
-            // Vault is registered - validate it belongs to the same investor
-            // If different, revert with specific error; if same, revert with already registered
-            _validateVaultBelongsToInvestor(vaultAddress, vaultInvestorId, investorId);
+        _useNonce(investorWalletAddress);
 
-            // If it belongs to the same investor, it's already registered
-            revert VaultAlreadyRegistered(vaultAddress);
-        }
-
-        // Check investor wallet has balance > 0
-        if (IERC20(_token).balanceOf(investorWalletAddress) == 0) {
-            revert InvestorHasNoBalance(investorWalletAddress);
-        }
-
-        // Register the vault under the investor identity
-        registryService.addWallet(vaultAddress, investorId);
-
-        emit VaultRegistered(investorWalletAddress, vaultAddress, _token, investorId, _msgSender());
+        _registerVaultInternal(vaultAddress, investorWalletAddress);
     }
 
     /**
@@ -115,30 +109,22 @@ contract VaultRegistrar is IVaultRegistrar, BaseVaultRegistrar {
      * @param investorWalletAddress The investor's wallet address
      * @return True if the vault is registered for the investor
      */
-    function isRegistered(
-        address vaultAddress,
-        address investorWalletAddress
-    ) external view returns (bool) {
-        // Get Registry Service
+    function isRegistered(address vaultAddress, address investorWalletAddress) external view returns (bool) {
         IDSRegistryService registryService = IDSRegistryService(
             IDSServiceConsumer(token).getDSService(REGISTRY_SERVICE)
         );
 
-        // Get investor ID from vault - if empty, vault is not registered
         string memory vaultInvestorId = registryService.getInvestor(vaultAddress);
         if (bytes(vaultInvestorId).length == 0) {
             return false;
         }
 
-        // Get investor ID from investor wallet - if empty, investor is not registered
         string memory investorId = registryService.getInvestor(investorWalletAddress);
         if (bytes(investorId).length == 0) {
             return false;
         }
 
-        // Vault is registered - validate it belongs to the same investor
-        // If different, revert with specific error
-        _validateVaultBelongsToInvestor( vaultAddress, vaultInvestorId, investorId);
+        _validateVaultBelongsToInvestor(vaultAddress, vaultInvestorId, investorId);
 
         return true;
     }
@@ -152,5 +138,47 @@ contract VaultRegistrar is IVaultRegistrar, BaseVaultRegistrar {
         address /* investorWalletAddress */
     ) external pure {
         revert NotImplemented();
+    }
+
+    /**
+     * @dev Validates that a vault belongs to the expected investor by comparing investor IDs
+     */
+    function _validateVaultBelongsToInvestor(
+        address vaultAddress,
+        string memory vaultInvestorId,
+        string memory expectedInvestorId
+    ) private pure {
+        if (keccak256(bytes(vaultInvestorId)) != keccak256(bytes(expectedInvestorId))) {
+            revert VaultBelongsToDifferentInvestor(vaultAddress, vaultInvestorId);
+        }
+    }
+
+    /**
+     * @dev Core registration logic shared by registerVault and registerVaultWithSig
+     * @param vaultAddress The vault address to register
+     * @param investorWalletAddress The investor's wallet address
+     */
+    function _registerVaultInternal(address vaultAddress, address investorWalletAddress) private {
+        address _token = token;
+
+        IDSRegistryService registryService = IDSRegistryService(
+            IDSServiceConsumer(_token).getDSService(REGISTRY_SERVICE)
+        );
+
+        string memory investorId = registryService.getInvestor(investorWalletAddress);
+        if (bytes(investorId).length == 0) {
+            revert InvestorNotFound(investorWalletAddress);
+        }
+
+        string memory vaultInvestorId = registryService.getInvestor(vaultAddress);
+        if (bytes(vaultInvestorId).length > 0) {
+            _validateVaultBelongsToInvestor(vaultAddress, vaultInvestorId, investorId);
+            revert VaultAlreadyRegistered(vaultAddress);
+        }
+
+
+        registryService.addWallet(vaultAddress, investorId);
+
+        emit VaultRegistered(investorWalletAddress, vaultAddress, _token, investorId, _msgSender());
     }
 }

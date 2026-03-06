@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-pragma solidity ^0.8.22;
+pragma solidity ^0.8.24;
 
 import {Errors} from "./Errors.sol";
 
@@ -64,6 +64,21 @@ interface IVaultRegistrar is Errors {
      * @custom:selector 0x05c4fdf9
      */
     function registerVault(address vaultAddress, address investorWalletAddress) external;
+
+    /**
+     * @dev Registers a vault with explicit investor consent via EIP-712 signature
+     * @param vaultAddress The vault address to register
+     * @param investorWalletAddress The investor's wallet address (signer)
+     * @param deadline Unix timestamp after which the signature is invalid
+     * @param signature EIP-712 signature — supports EOA (ECDSA) and smart contract wallets (ERC-1271)
+     * @custom:selector 0xa4b6aee0
+     */
+    function registerVaultWithSig(
+        address vaultAddress,
+        address investorWalletAddress,
+        uint256 deadline,
+        bytes calldata signature
+    ) external;
 
     /**
      * @dev Checks if a vault is registered for an investor

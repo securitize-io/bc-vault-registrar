@@ -16,12 +16,14 @@
  * limitations under the License.
  */
 
-pragma solidity ^0.8.22;
+pragma solidity ^0.8.24;
 
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
+import {NoncesUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/NoncesUpgradeable.sol";
 import {ERC1967Utils} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Utils.sol";
 import {Errors} from "./Errors.sol";
 
@@ -29,11 +31,18 @@ import {Errors} from "./Errors.sol";
  * @title BaseVaultRegistrar
  * @dev Abstract base contract with common functionality for vault registrar contracts
  */
-abstract contract BaseVaultRegistrar is Errors, UUPSUpgradeable, PausableUpgradeable, AccessControlUpgradeable {
+abstract contract BaseVaultRegistrar is
+    Errors,
+    UUPSUpgradeable,
+    PausableUpgradeable,
+    AccessControlUpgradeable,
+    EIP712Upgradeable,
+    NoncesUpgradeable
+{
     /// @dev Service ID for Registry Service in DSToken
     uint256 public constant REGISTRY_SERVICE = 4;
 
-    /// @dev Role for operators who can call register vault
+    /// @dev Role for operators who can call registerVaultWithSig
     bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
 
     /// @dev Emitted when a protocol is authorized as an operator
@@ -44,14 +53,6 @@ abstract contract BaseVaultRegistrar is Errors, UUPSUpgradeable, PausableUpgrade
 
     /// @dev Storage gap for future upgrades
     uint256[48] private __gap;
-
-    /// @dev Modifier to allow only DEFAULT_ADMIN_ROLE or OPERATOR_ROLE
-    modifier onlyAdminOrOperator() {
-        if (!hasRole(DEFAULT_ADMIN_ROLE, _msgSender()) && !hasRole(OPERATOR_ROLE, _msgSender())) {
-            revert IAccessControl.AccessControlUnauthorizedAccount(_msgSender(), OPERATOR_ROLE);
-        }
-        _;
-    }
 
     /// @dev Modifier to validate that address is not zero
     modifier notZeroAddress(address account) {
@@ -73,6 +74,8 @@ abstract contract BaseVaultRegistrar is Errors, UUPSUpgradeable, PausableUpgrade
         __UUPSUpgradeable_init();
         __Pausable_init();
         __AccessControl_init();
+        __EIP712_init("VaultRegistrar", "1");
+        __Nonces_init();
 
         _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
     }

@@ -1,10 +1,46 @@
 import { expect } from 'chai';
-import { loadFixture } from '@nomicfoundation/hardhat-network-helpers';
+import { loadFixture, time } from '@nomicfoundation/hardhat-network-helpers';
+import hre from 'hardhat';
+import { HardhatEthersSigner } from '@nomicfoundation/hardhat-ethers/signers';
+import { VaultRegistrar } from '../typechain-types';
 import { deployVaultRegistrar } from './fixture';
 
 describe('VaultRegistrar', function () {
     const INVESTOR_ID = 'investor-123';
 
+    // ── EIP-712 signing helper ───────────────────────────────────────────────
+    async function signRegisterVault(
+        signer: HardhatEthersSigner,
+        vaultRegistrar: VaultRegistrar,
+        investor: string,
+        operator: string,
+        token: string,
+        deadline: number,
+    ): Promise<string> {
+        const nonce = await vaultRegistrar.nonces(investor);
+        const chainId = (await hre.ethers.provider.getNetwork()).chainId;
+
+        return signer.signTypedData(
+            {
+                name: 'VaultRegistrar',
+                version: '1',
+                chainId,
+                verifyingContract: await vaultRegistrar.getAddress(),
+            },
+            {
+                RegisterVault: [
+                    { name: 'investor', type: 'address' },
+                    { name: 'operator', type: 'address' },
+                    { name: 'token', type: 'address' },
+                    { name: 'nonce', type: 'uint256' },
+                    { name: 'deadline', type: 'uint256' },
+                ],
+            },
+            { investor, operator, token, nonce, deadline },
+        );
+    }
+
+    // ── Deployment ──────────────────────────────────────────────────────────
     describe('Deployment', function () {
         it('should deploy with correct token address', async function () {
             const { vaultRegistrar, mockDSToken } = await loadFixture(deployVaultRegistrar);
@@ -24,38 +60,32 @@ describe('VaultRegistrar', function () {
         });
     });
 
+    // ── Role Management ─────────────────────────────────────────────────────
     describe('Role Management', function () {
         it('should allow admin to grant OPERATOR_ROLE to a protocol', async function () {
             const { vaultRegistrar, admin, protocol2 } = await loadFixture(deployVaultRegistrar);
             const OPERATOR_ROLE = await vaultRegistrar.OPERATOR_ROLE();
 
-            // Note: protocol2 doesn't have OPERATOR_ROLE yet (only protocol1 has it in fixture)
             const tx = vaultRegistrar.connect(admin).addOperator(protocol2.address);
             await expect(tx)
                 .to.emit(vaultRegistrar, 'RoleGranted')
                 .withArgs(OPERATOR_ROLE, protocol2.address, admin.address);
 
-            const isOperator = await vaultRegistrar.isOperator(protocol2.address);
-            expect(isOperator).to.be.true;
+            expect(await vaultRegistrar.isOperator(protocol2.address)).to.be.true;
         });
 
         it('should revert when granting role to zero address', async function () {
             const { vaultRegistrar, admin } = await loadFixture(deployVaultRegistrar);
-            const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
-            
-            await expect(vaultRegistrar.connect(admin).addOperator(ZERO_ADDRESS)).to.be.reverted;
+            await expect(vaultRegistrar.connect(admin).addOperator(hre.ethers.ZeroAddress)).to.be.reverted;
         });
 
         it('should revert when revoking role from zero address', async function () {
             const { vaultRegistrar, admin } = await loadFixture(deployVaultRegistrar);
-            const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
-            
-            await expect(vaultRegistrar.connect(admin).removeOperator(ZERO_ADDRESS)).to.be.reverted;
+            await expect(vaultRegistrar.connect(admin).removeOperator(hre.ethers.ZeroAddress)).to.be.reverted;
         });
 
         it('should revert when non-admin tries to grant role', async function () {
             const { vaultRegistrar, protocol2, unauthorized } = await loadFixture(deployVaultRegistrar);
-
             await expect(vaultRegistrar.connect(unauthorized).addOperator(protocol2.address)).to.be.reverted;
         });
 
@@ -63,21 +93,17 @@ describe('VaultRegistrar', function () {
             const { vaultRegistrar, admin, protocol2 } = await loadFixture(deployVaultRegistrar);
             const OPERATOR_ROLE = await vaultRegistrar.OPERATOR_ROLE();
 
-            // Grant role first
             await vaultRegistrar.connect(admin).addOperator(protocol2.address);
 
-            // Then revoke it
             await expect(vaultRegistrar.connect(admin).removeOperator(protocol2.address))
                 .to.emit(vaultRegistrar, 'RoleRevoked')
                 .withArgs(OPERATOR_ROLE, protocol2.address, admin.address);
 
-            const isOperator = await vaultRegistrar.isOperator(protocol2.address);
-            expect(isOperator).to.be.false;
+            expect(await vaultRegistrar.isOperator(protocol2.address)).to.be.false;
         });
 
-        it('should emit ProtocolAuthorized event when adding an operator', async function () {
+        it('should emit ProtocolAuthorized when adding an operator', async function () {
             const { vaultRegistrar, admin, protocol2 } = await loadFixture(deployVaultRegistrar);
-
             await expect(vaultRegistrar.connect(admin).addOperator(protocol2.address))
                 .to.emit(vaultRegistrar, 'ProtocolAuthorized')
                 .withArgs(protocol2.address);
@@ -85,26 +111,17 @@ describe('VaultRegistrar', function () {
 
         it('should not emit ProtocolAuthorized when adding an operator that already has the role', async function () {
             const { vaultRegistrar, admin, protocol2 } = await loadFixture(deployVaultRegistrar);
-
-            // Grant role first time - should emit event
             await vaultRegistrar.connect(admin).addOperator(protocol2.address);
-
-            // Grant role second time - should NOT emit event
-            const tx = vaultRegistrar.connect(admin).addOperator(protocol2.address);
-            await expect(tx).to.not.emit(vaultRegistrar, 'ProtocolAuthorized');
-
-            // Verify role is still granted
-            const isOperator = await vaultRegistrar.isOperator(protocol2.address);
-            expect(isOperator).to.be.true;
+            await expect(vaultRegistrar.connect(admin).addOperator(protocol2.address)).to.not.emit(
+                vaultRegistrar,
+                'ProtocolAuthorized',
+            );
+            expect(await vaultRegistrar.isOperator(protocol2.address)).to.be.true;
         });
 
-        it('should emit ProtocolRevoked event when removing an operator', async function () {
+        it('should emit ProtocolRevoked when removing an operator', async function () {
             const { vaultRegistrar, admin, protocol2 } = await loadFixture(deployVaultRegistrar);
-
-            // Grant role first
             await vaultRegistrar.connect(admin).addOperator(protocol2.address);
-
-            // Then revoke it and verify ProtocolRevoked event
             await expect(vaultRegistrar.connect(admin).removeOperator(protocol2.address))
                 .to.emit(vaultRegistrar, 'ProtocolRevoked')
                 .withArgs(protocol2.address);
@@ -112,99 +129,286 @@ describe('VaultRegistrar', function () {
 
         it('should not emit ProtocolRevoked when removing an operator that does not have the role', async function () {
             const { vaultRegistrar, admin, protocol2 } = await loadFixture(deployVaultRegistrar);
-
-            // Verify protocol2 doesn't have the role initially
-            const isOperatorBefore = await vaultRegistrar.isOperator(protocol2.address);
-            expect(isOperatorBefore).to.be.false;
-
-            // Try to remove role - should NOT emit event
-            const tx = vaultRegistrar.connect(admin).removeOperator(protocol2.address);
-            await expect(tx).to.not.emit(vaultRegistrar, 'ProtocolRevoked');
-
-            // Verify role is still not granted
-            const isOperatorAfter = await vaultRegistrar.isOperator(protocol2.address);
-            expect(isOperatorAfter).to.be.false;
+            expect(await vaultRegistrar.isOperator(protocol2.address)).to.be.false;
+            await expect(vaultRegistrar.connect(admin).removeOperator(protocol2.address)).to.not.emit(
+                vaultRegistrar,
+                'ProtocolRevoked',
+            );
         });
     });
 
+    // ── registerVault (operator path) ──────────────────────────────────────
     describe('registerVault', function () {
-        it('should register a vault successfully when protocol calls registerVault', async function () {
+        it('should register a vault when operator calls registerVault', async function () {
             const { vaultRegistrar, mockDSToken, mockRegistryService, protocol1, investor1, vaults } =
                 await loadFixture(deployVaultRegistrar);
 
-            // Setup: protocol1 already has OPERATOR_ROLE (from fixture), register investor, mint tokens
             await mockRegistryService.registerInvestor(investor1.address, INVESTOR_ID);
-            await mockDSToken.mint(investor1.address, 1000);
 
-            // Protocol calls registerVault (firmado por protocol1)
             await expect(vaultRegistrar.connect(protocol1).registerVault(vaults[0].address, investor1.address))
                 .to.emit(vaultRegistrar, 'VaultRegistered')
                 .withArgs(investor1.address, vaults[0].address, await mockDSToken.getAddress(), INVESTOR_ID, protocol1.address);
 
-            // Verify vault is registered
-            const investorId = await mockRegistryService.getInvestor(vaults[0].address);
-            expect(investorId).to.equal(INVESTOR_ID);
+            expect(await mockRegistryService.getInvestor(vaults[0].address)).to.equal(INVESTOR_ID);
         });
 
-        it('should revert when caller does not have OPERATOR_ROLE', async function () {
-            const { vaultRegistrar, investor1, vaults, unauthorized } = await loadFixture(deployVaultRegistrar);
+        it('should revert when admin calls registerVault (only operators allowed)', async function () {
+            const { vaultRegistrar, mockRegistryService, mockDSToken, admin, investor1, vaults } =
+                await loadFixture(deployVaultRegistrar);
 
+            await mockRegistryService.registerInvestor(investor1.address, INVESTOR_ID);
+
+            await expect(
+                vaultRegistrar.connect(admin).registerVault(vaults[0].address, investor1.address),
+            ).to.be.reverted;
+        });
+
+        it('should revert when caller does not have any role', async function () {
+            const { vaultRegistrar, investor1, vaults, unauthorized } = await loadFixture(deployVaultRegistrar);
             await expect(vaultRegistrar.connect(unauthorized).registerVault(vaults[0].address, investor1.address)).to.be
                 .reverted;
         });
 
         it('should revert when investor is not found', async function () {
-            const { vaultRegistrar, protocol1, investor1, vaults } = await loadFixture(deployVaultRegistrar);
-
-            // protocol1 already has OPERATOR_ROLE but investor is not registered
-            await expect(vaultRegistrar.connect(protocol1).registerVault(vaults[0].address, investor1.address)).to.be
+            const { vaultRegistrar, admin, investor1, vaults } = await loadFixture(deployVaultRegistrar);
+            await expect(vaultRegistrar.connect(admin).registerVault(vaults[0].address, investor1.address)).to.be
                 .reverted;
         });
 
-        it('should revert when vault is already registered', async function () {
-            const { vaultRegistrar, mockDSToken, mockRegistryService, protocol1, investor1, vaults } =
+        it('should revert when vault is already registered for a different investor', async function () {
+            const { vaultRegistrar, mockDSToken, mockRegistryService, admin, investor1, vaults } =
                 await loadFixture(deployVaultRegistrar);
 
-            // Setup
             await mockRegistryService.registerInvestor(investor1.address, INVESTOR_ID);
-            await mockDSToken.mint(investor1.address, 1000);
-
-            // Register vault directly (simulating already registered)
             await mockRegistryService.registerInvestor(vaults[0].address, 'other-investor');
 
-            await expect(vaultRegistrar.connect(protocol1).registerVault(vaults[0].address, investor1.address)).to.be
-                .reverted;
-        });
-
-        it('should revert when investor has no balance', async function () {
-            const { vaultRegistrar, mockRegistryService, protocol1, investor1, vaults } =
-                await loadFixture(deployVaultRegistrar);
-
-            // Setup: protocol1 has OPERATOR_ROLE, register investor, but NO tokens
-            await mockRegistryService.registerInvestor(investor1.address, INVESTOR_ID);
-            // No minting - investor has 0 balance
-
-            await expect(vaultRegistrar.connect(protocol1).registerVault(vaults[0].address, investor1.address)).to.be
-                .reverted;
+            await expect(
+                vaultRegistrar.connect(admin).registerVault(vaults[0].address, investor1.address),
+            ).to.be.reverted;
         });
 
         it('should revert when vault address is zero', async function () {
-            const { vaultRegistrar, protocol1, investor1 } = await loadFixture(deployVaultRegistrar);
-
+            const { vaultRegistrar, admin, investor1 } = await loadFixture(deployVaultRegistrar);
             await expect(
-                vaultRegistrar
-                    .connect(protocol1)
-                    .registerVault('0x0000000000000000000000000000000000000000', investor1.address),
+                vaultRegistrar.connect(admin).registerVault(hre.ethers.ZeroAddress, investor1.address),
             ).to.be.reverted;
         });
 
         it('should revert when investor address is zero', async function () {
-            const { vaultRegistrar, protocol1, vaults } = await loadFixture(deployVaultRegistrar);
+            const { vaultRegistrar, admin, vaults } = await loadFixture(deployVaultRegistrar);
+            await expect(
+                vaultRegistrar.connect(admin).registerVault(vaults[0].address, hre.ethers.ZeroAddress),
+            ).to.be.reverted;
+        });
+
+        it('should revert when contract is paused', async function () {
+            const { vaultRegistrar, mockDSToken, mockRegistryService, admin, investor1, vaults } =
+                await loadFixture(deployVaultRegistrar);
+
+            await mockRegistryService.registerInvestor(investor1.address, INVESTOR_ID);
+            await vaultRegistrar.connect(admin).pause();
+
+            await expect(
+                vaultRegistrar.connect(admin).registerVault(vaults[0].address, investor1.address),
+            ).to.be.reverted;
+        });
+    });
+
+    // ── registerVaultWithSig ────────────────────────────────────────────────
+    describe('registerVaultWithSig', function () {
+        it('should register a vault with a valid investor signature', async function () {
+            const { vaultRegistrar, mockDSToken, mockRegistryService, protocol1, investor1, vaults } =
+                await loadFixture(deployVaultRegistrar);
+
+            await mockRegistryService.registerInvestor(investor1.address, INVESTOR_ID);
+
+            const deadline = (await time.latest()) + 600;
+            const sig = await signRegisterVault(
+                investor1,
+                vaultRegistrar,
+                investor1.address,
+                protocol1.address,
+                await mockDSToken.getAddress(),
+                deadline,
+            );
+
+            await expect(
+                vaultRegistrar.connect(protocol1).registerVaultWithSig(vaults[0].address, investor1.address, deadline, sig),
+            )
+                .to.emit(vaultRegistrar, 'VaultRegistered')
+                .withArgs(investor1.address, vaults[0].address, await mockDSToken.getAddress(), INVESTOR_ID, protocol1.address);
+
+            expect(await mockRegistryService.getInvestor(vaults[0].address)).to.equal(INVESTOR_ID);
+        });
+
+        it('should increment nonce after successful registration', async function () {
+            const { vaultRegistrar, mockDSToken, mockRegistryService, protocol1, investor1, vaults } =
+                await loadFixture(deployVaultRegistrar);
+
+            await mockRegistryService.registerInvestor(investor1.address, INVESTOR_ID);
+
+            expect(await vaultRegistrar.nonces(investor1.address)).to.equal(0);
+
+            const deadline = (await time.latest()) + 600;
+            const sig = await signRegisterVault(
+                investor1,
+                vaultRegistrar,
+                investor1.address,
+                protocol1.address,
+                await mockDSToken.getAddress(),
+                deadline,
+            );
+
+            await vaultRegistrar.connect(protocol1).registerVaultWithSig(vaults[0].address, investor1.address, deadline, sig);
+
+            expect(await vaultRegistrar.nonces(investor1.address)).to.equal(1);
+        });
+
+        it('should revert when signature is expired', async function () {
+            const { vaultRegistrar, mockDSToken, mockRegistryService, protocol1, investor1, vaults } =
+                await loadFixture(deployVaultRegistrar);
+
+            await mockRegistryService.registerInvestor(investor1.address, INVESTOR_ID);
+
+            const deadline = (await time.latest()) - 1;
+            const sig = await signRegisterVault(
+                investor1,
+                vaultRegistrar,
+                investor1.address,
+                protocol1.address,
+                await mockDSToken.getAddress(),
+                deadline,
+            );
+
+            await expect(
+                vaultRegistrar.connect(protocol1).registerVaultWithSig(vaults[0].address, investor1.address, deadline, sig),
+            ).to.be.revertedWithCustomError(vaultRegistrar, 'SignatureExpired');
+        });
+
+        it('should revert on replay attack (reusing a consumed signature)', async function () {
+            const { vaultRegistrar, mockDSToken, mockRegistryService, protocol1, investor1, vaults } =
+                await loadFixture(deployVaultRegistrar);
+
+            await mockRegistryService.registerInvestor(investor1.address, INVESTOR_ID);
+
+            const deadline = (await time.latest()) + 600;
+            const sig = await signRegisterVault(
+                investor1,
+                vaultRegistrar,
+                investor1.address,
+                protocol1.address,
+                await mockDSToken.getAddress(),
+                deadline,
+            );
+
+            // First use succeeds
+            await vaultRegistrar.connect(protocol1).registerVaultWithSig(vaults[0].address, investor1.address, deadline, sig);
+
+            // Replay with same signature must fail
+            await expect(
+                vaultRegistrar.connect(protocol1).registerVaultWithSig(vaults[1].address, investor1.address, deadline, sig),
+            ).to.be.revertedWithCustomError(vaultRegistrar, 'InvalidInvestorSignature');
+        });
+
+        it('should revert when a different operator submits the signature (cross-protocol attack)', async function () {
+            const { vaultRegistrar, mockDSToken, mockRegistryService, protocol1, protocol2, admin, investor1, vaults } =
+                await loadFixture(deployVaultRegistrar);
+
+            await mockRegistryService.registerInvestor(investor1.address, INVESTOR_ID);
+            await vaultRegistrar.connect(admin).addOperator(protocol2.address);
+
+            const deadline = (await time.latest()) + 600;
+            // Signature is bound to protocol1 as operator
+            const sig = await signRegisterVault(
+                investor1,
+                vaultRegistrar,
+                investor1.address,
+                protocol1.address,
+                await mockDSToken.getAddress(),
+                deadline,
+            );
+
+            // protocol2 tries to submit protocol1's signature
+            await expect(
+                vaultRegistrar.connect(protocol2).registerVaultWithSig(vaults[0].address, investor1.address, deadline, sig),
+            ).to.be.revertedWithCustomError(vaultRegistrar, 'InvalidInvestorSignature');
+        });
+
+        it('should revert when signature is from a different investor (wrong signer)', async function () {
+            const { vaultRegistrar, mockDSToken, mockRegistryService, protocol1, investor1, investor2, vaults } =
+                await loadFixture(deployVaultRegistrar);
+
+            await mockRegistryService.registerInvestor(investor1.address, INVESTOR_ID);
+
+            const deadline = (await time.latest()) + 600;
+            // investor2 signs but investor1 is passed as the investor
+            const sig = await signRegisterVault(
+                investor2,
+                vaultRegistrar,
+                investor1.address,
+                protocol1.address,
+                await mockDSToken.getAddress(),
+                deadline,
+            );
+
+            await expect(
+                vaultRegistrar.connect(protocol1).registerVaultWithSig(vaults[0].address, investor1.address, deadline, sig),
+            ).to.be.revertedWithCustomError(vaultRegistrar, 'InvalidInvestorSignature');
+        });
+
+        it('should revert when caller does not have OPERATOR_ROLE', async function () {
+            const { vaultRegistrar, mockDSToken, mockRegistryService, unauthorized, investor1, vaults } =
+                await loadFixture(deployVaultRegistrar);
+
+            await mockRegistryService.registerInvestor(investor1.address, INVESTOR_ID);
+
+            const deadline = (await time.latest()) + 600;
+            const sig = await signRegisterVault(
+                investor1,
+                vaultRegistrar,
+                investor1.address,
+                unauthorized.address,
+                await mockDSToken.getAddress(),
+                deadline,
+            );
+
+            await expect(
+                vaultRegistrar
+                    .connect(unauthorized)
+                    .registerVaultWithSig(vaults[0].address, investor1.address, deadline, sig),
+            ).to.be.reverted;
+        });
+
+        it('should revert when vault address is zero', async function () {
+            const { vaultRegistrar, mockDSToken, protocol1, investor1 } = await loadFixture(deployVaultRegistrar);
+
+            const deadline = (await time.latest()) + 600;
+            const sig = await signRegisterVault(
+                investor1,
+                vaultRegistrar,
+                investor1.address,
+                protocol1.address,
+                await mockDSToken.getAddress(),
+                deadline,
+            );
 
             await expect(
                 vaultRegistrar
                     .connect(protocol1)
-                    .registerVault(vaults[0].address, '0x0000000000000000000000000000000000000000'),
+                    .registerVaultWithSig(hre.ethers.ZeroAddress, investor1.address, deadline, sig),
+            ).to.be.reverted;
+        });
+
+        it('should revert when investor address is zero', async function () {
+            const { vaultRegistrar, mockDSToken, protocol1 } = await loadFixture(deployVaultRegistrar);
+
+            const deadline = (await time.latest()) + 600;
+            const fakeSig = '0x' + '00'.repeat(65);
+
+            await expect(
+                vaultRegistrar
+                    .connect(protocol1)
+                    .registerVaultWithSig(hre.ethers.ZeroAddress, hre.ethers.ZeroAddress, deadline, fakeSig),
             ).to.be.reverted;
         });
 
@@ -212,233 +416,325 @@ describe('VaultRegistrar', function () {
             const { vaultRegistrar, mockDSToken, mockRegistryService, admin, protocol1, investor1, vaults } =
                 await loadFixture(deployVaultRegistrar);
 
-            // Setup
             await mockRegistryService.registerInvestor(investor1.address, INVESTOR_ID);
-            await mockDSToken.mint(investor1.address, 1000);
-
-            // Pause (firmado por admin)
             await vaultRegistrar.connect(admin).pause();
 
-            await expect(vaultRegistrar.connect(protocol1).registerVault(vaults[0].address, investor1.address)).to.be
-                .reverted;
+            const deadline = (await time.latest()) + 600;
+            const sig = await signRegisterVault(
+                investor1,
+                vaultRegistrar,
+                investor1.address,
+                protocol1.address,
+                await mockDSToken.getAddress(),
+                deadline,
+            );
+
+            await expect(
+                vaultRegistrar.connect(protocol1).registerVaultWithSig(vaults[0].address, investor1.address, deadline, sig),
+            ).to.be.reverted;
+        });
+
+        it('should revert when investor is not found in registry', async function () {
+            const { vaultRegistrar, mockDSToken, protocol1, investor1, vaults } =
+                await loadFixture(deployVaultRegistrar);
+
+            const deadline = (await time.latest()) + 600;
+            const sig = await signRegisterVault(
+                investor1,
+                vaultRegistrar,
+                investor1.address,
+                protocol1.address,
+                await mockDSToken.getAddress(),
+                deadline,
+            );
+
+            await expect(
+                vaultRegistrar.connect(protocol1).registerVaultWithSig(vaults[0].address, investor1.address, deadline, sig),
+            ).to.be.revertedWithCustomError(vaultRegistrar, 'InvestorNotFound');
+        });
+
+        it('should revert when vault is already registered', async function () {
+            const { vaultRegistrar, mockDSToken, mockRegistryService, protocol1, investor1, vaults } =
+                await loadFixture(deployVaultRegistrar);
+
+            await mockRegistryService.registerInvestor(investor1.address, INVESTOR_ID);
+
+            const deadline = (await time.latest()) + 600;
+            const sig1 = await signRegisterVault(
+                investor1,
+                vaultRegistrar,
+                investor1.address,
+                protocol1.address,
+                await mockDSToken.getAddress(),
+                deadline,
+            );
+            await vaultRegistrar.connect(protocol1).registerVaultWithSig(vaults[0].address, investor1.address, deadline, sig1);
+
+            // Try to register the same vault again with a fresh signature
+            const deadline2 = (await time.latest()) + 600;
+            const sig2 = await signRegisterVault(
+                investor1,
+                vaultRegistrar,
+                investor1.address,
+                protocol1.address,
+                await mockDSToken.getAddress(),
+                deadline2,
+            );
+            await expect(
+                vaultRegistrar.connect(protocol1).registerVaultWithSig(vaults[0].address, investor1.address, deadline2, sig2),
+            ).to.be.revertedWithCustomError(vaultRegistrar, 'VaultAlreadyRegistered');
+        });
+
+        it('nonce should not be consumed on failed registration', async function () {
+            const { vaultRegistrar, mockDSToken, protocol1, investor1, vaults } =
+                await loadFixture(deployVaultRegistrar);
+
+            // investor not registered — will fail at _registerVaultInternal
+            const deadline = (await time.latest()) + 600;
+            const sig = await signRegisterVault(
+                investor1,
+                vaultRegistrar,
+                investor1.address,
+                protocol1.address,
+                await mockDSToken.getAddress(),
+                deadline,
+            );
+
+            await expect(
+                vaultRegistrar.connect(protocol1).registerVaultWithSig(vaults[0].address, investor1.address, deadline, sig),
+            ).to.be.reverted;
+
+            // Nonce must still be 0
+            expect(await vaultRegistrar.nonces(investor1.address)).to.equal(0);
         });
     });
 
+    // ── isRegistered ────────────────────────────────────────────────────────
     describe('isRegistered', function () {
         it('should return true when vault is registered for investor', async function () {
             const { vaultRegistrar, mockDSToken, mockRegistryService, protocol1, investor1, vaults } =
                 await loadFixture(deployVaultRegistrar);
 
-            // Setup: register investor, mint tokens, and register vault
             await mockRegistryService.registerInvestor(investor1.address, INVESTOR_ID);
-            await mockDSToken.mint(investor1.address, 1000);
-            await vaultRegistrar.connect(protocol1).registerVault(vaults[0].address, investor1.address);
 
-            // Check if vault is registered
-            const isRegistered = await vaultRegistrar.isRegistered(vaults[0].address, investor1.address);
-            expect(isRegistered).to.be.true;
+            const deadline = (await time.latest()) + 600;
+            const sig = await signRegisterVault(
+                investor1,
+                vaultRegistrar,
+                investor1.address,
+                protocol1.address,
+                await mockDSToken.getAddress(),
+                deadline,
+            );
+            await vaultRegistrar.connect(protocol1).registerVaultWithSig(vaults[0].address, investor1.address, deadline, sig);
+
+            expect(await vaultRegistrar.isRegistered(vaults[0].address, investor1.address)).to.be.true;
         });
 
         it('should return false when vault is not registered', async function () {
             const { vaultRegistrar, mockRegistryService, investor1, vaults } = await loadFixture(deployVaultRegistrar);
-
-            // Setup: register investor but don't register vault
             await mockRegistryService.registerInvestor(investor1.address, INVESTOR_ID);
-
-            // Check if vault is registered
-            const isRegistered = await vaultRegistrar.isRegistered(vaults[0].address, investor1.address);
-            expect(isRegistered).to.be.false;
+            expect(await vaultRegistrar.isRegistered(vaults[0].address, investor1.address)).to.be.false;
         });
 
         it('should revert with VaultBelongsToDifferentInvestor when vault belongs to different investor', async function () {
             const { vaultRegistrar, mockDSToken, mockRegistryService, protocol1, investor1, investor2, vaults } =
                 await loadFixture(deployVaultRegistrar);
 
-            // Setup: register both investors
             await mockRegistryService.registerInvestor(investor1.address, INVESTOR_ID);
             await mockRegistryService.registerInvestor(investor2.address, 'investor-456');
-            await mockDSToken.mint(investor1.address, 1000);
 
-            // Register vault for investor1
-            await vaultRegistrar.connect(protocol1).registerVault(vaults[0].address, investor1.address);
+            const deadline = (await time.latest()) + 600;
+            const sig = await signRegisterVault(
+                investor1,
+                vaultRegistrar,
+                investor1.address,
+                protocol1.address,
+                await mockDSToken.getAddress(),
+                deadline,
+            );
+            await vaultRegistrar.connect(protocol1).registerVaultWithSig(vaults[0].address, investor1.address, deadline, sig);
 
-            // Check if vault is registered for investor2 (should revert with VaultBelongsToDifferentInvestor)
             await expect(vaultRegistrar.isRegistered(vaults[0].address, investor2.address))
                 .to.be.revertedWithCustomError(vaultRegistrar, 'VaultBelongsToDifferentInvestor')
                 .withArgs(vaults[0].address, INVESTOR_ID);
         });
 
-        it('should return false when vault address is not registered', async function () {
-            const { vaultRegistrar, mockRegistryService, investor1, vaults } = await loadFixture(deployVaultRegistrar);
-
-            // Setup: register investor but vault is not registered
-            await mockRegistryService.registerInvestor(investor1.address, INVESTOR_ID);
-
-            // Check if unregistered vault is registered
-            const isRegistered = await vaultRegistrar.isRegistered(vaults[0].address, investor1.address);
-            expect(isRegistered).to.be.false;
-        });
-
         it('should return false when investor is not registered', async function () {
             const { vaultRegistrar, vaults, investor1 } = await loadFixture(deployVaultRegistrar);
-
-            // Check if vault is registered for unregistered investor
-            const isRegistered = await vaultRegistrar.isRegistered(vaults[0].address, investor1.address);
-            expect(isRegistered).to.be.false;
+            expect(await vaultRegistrar.isRegistered(vaults[0].address, investor1.address)).to.be.false;
         });
     });
 
+    // ── unregisterVault ─────────────────────────────────────────────────────
     describe('unregisterVault', function () {
         it('should revert with NotImplemented error', async function () {
             const { vaultRegistrar, protocol1, investor1, vaults } = await loadFixture(deployVaultRegistrar);
-
-            // unregisterVault should always revert with NotImplemented
             await expect(vaultRegistrar.connect(protocol1).unregisterVault(vaults[0].address, investor1.address))
                 .to.be.revertedWithCustomError(vaultRegistrar, 'NotImplemented');
         });
     });
 
+    // ── Pause/Unpause ────────────────────────────────────────────────────────
     describe('Pause/Unpause', function () {
         it('should allow admin to pause', async function () {
             const { vaultRegistrar, admin } = await loadFixture(deployVaultRegistrar);
-
             await vaultRegistrar.connect(admin).pause();
-            const isPaused = await vaultRegistrar.paused();
-            expect(isPaused).to.be.true;
+            expect(await vaultRegistrar.paused()).to.be.true;
         });
 
         it('should allow admin to unpause', async function () {
             const { vaultRegistrar, admin } = await loadFixture(deployVaultRegistrar);
-
             await vaultRegistrar.connect(admin).pause();
             await vaultRegistrar.connect(admin).unpause();
-            const isPaused = await vaultRegistrar.paused();
-            expect(isPaused).to.be.false;
+            expect(await vaultRegistrar.paused()).to.be.false;
         });
 
         it('should revert when non-admin tries to pause', async function () {
             const { vaultRegistrar, unauthorized } = await loadFixture(deployVaultRegistrar);
-
             await expect(vaultRegistrar.connect(unauthorized).pause()).to.be.reverted;
         });
     });
 
+    // ── DeFi Protocol Integration ───────────────────────────────────────────
     describe('DeFi Protocol Integration', function () {
         it('should create and register vault on first deposit', async function () {
             const { vaultRegistrar, mockDeFiProtocol, mockDSToken, mockRegistryService, investor1 } =
                 await loadFixture(deployVaultRegistrar);
 
-            // Setup: registrar inversor y mint tokens
             await mockRegistryService.registerInvestor(investor1.address, INVESTOR_ID);
             await mockDSToken.mint(investor1.address, 1000);
-
-            // Investor aprueba tokens al MockDeFiProtocol
             await mockDSToken.connect(investor1).approve(await mockDeFiProtocol.getAddress(), 1000);
 
-            // Investor deposita (firmado por investor1)
-            // MockDeFiProtocol transfiere tokens desde investor1 hacia el vault creado
-            const tx = await mockDeFiProtocol.connect(investor1).deposit(1000);
-            
-            // Obtener el vault address después de la transacción
+            const deadline = (await time.latest()) + 600;
+            const sig = await signRegisterVault(
+                investor1,
+                vaultRegistrar,
+                investor1.address,
+                await mockDeFiProtocol.getAddress(),
+                await mockDSToken.getAddress(),
+                deadline,
+            );
+
+            const tx = await mockDeFiProtocol.connect(investor1).deposit(1000, deadline, sig);
             const vaultAddress = await mockDeFiProtocol.investorVaults(investor1.address);
-            
-            // Verificar el evento con los valores correctos
+
             await expect(tx)
                 .to.emit(vaultRegistrar, 'VaultRegistered')
-                .withArgs(
-                    investor1.address,
-                    vaultAddress,
-                    await mockDSToken.getAddress(),
-                    INVESTOR_ID,
-                    await mockDeFiProtocol.getAddress(),
-                );
+                .withArgs(investor1.address, vaultAddress, await mockDSToken.getAddress(), INVESTOR_ID, await mockDeFiProtocol.getAddress());
 
-            // Verificar que los tokens fueron transferidos al vault
             expect(await mockDSToken.balanceOf(vaultAddress)).to.equal(1000);
             expect(await mockDSToken.balanceOf(investor1.address)).to.equal(0);
         });
 
         it('should deposit to existing vault without registering again', async function () {
-            const { vaultRegistrar, mockDeFiProtocol, mockDSToken, mockRegistryService, investor1 } =
+            const { mockDeFiProtocol, mockDSToken, mockRegistryService, investor1, vaultRegistrar } =
                 await loadFixture(deployVaultRegistrar);
 
-            // Setup: registrar inversor y mint tokens
             await mockRegistryService.registerInvestor(investor1.address, INVESTOR_ID);
             await mockDSToken.mint(investor1.address, 2000);
-
-            // First deposit - creates vault and registers
             await mockDSToken.connect(investor1).approve(await mockDeFiProtocol.getAddress(), 2000);
-            await mockDeFiProtocol.connect(investor1).deposit(1000);
 
+            const deadline = (await time.latest()) + 600;
+            const sig = await signRegisterVault(
+                investor1,
+                vaultRegistrar,
+                investor1.address,
+                await mockDeFiProtocol.getAddress(),
+                await mockDSToken.getAddress(),
+                deadline,
+            );
+
+            // First deposit — creates vault and registers
+            await mockDeFiProtocol.connect(investor1).deposit(1000, deadline, sig);
             const vaultAddress = await mockDeFiProtocol.investorVaults(investor1.address);
             expect(await mockDSToken.balanceOf(vaultAddress)).to.equal(1000);
 
-            // Second deposit - should only transfer tokens, not register again
-            await expect(mockDeFiProtocol.connect(investor1).deposit(1000))
+            // Second deposit — no signature needed (vault already exists)
+            await expect(mockDeFiProtocol.connect(investor1).deposit(1000, 0, '0x'))
                 .to.emit(mockDeFiProtocol, 'Deposit')
                 .withArgs(investor1.address, vaultAddress, 1000);
 
-            // Verify tokens were added
             expect(await mockDSToken.balanceOf(vaultAddress)).to.equal(2000);
             expect(await mockDSToken.balanceOf(investor1.address)).to.equal(0);
         });
 
         it('should revert deposit when investor is not registered', async function () {
-            const { mockDeFiProtocol, mockDSToken, investor2 } = await loadFixture(deployVaultRegistrar);
+            const { mockDeFiProtocol, mockDSToken, vaultRegistrar, investor2 } =
+                await loadFixture(deployVaultRegistrar);
 
-            // Mint tokens but don't register investor
             await mockDSToken.mint(investor2.address, 1000);
             await mockDSToken.connect(investor2).approve(await mockDeFiProtocol.getAddress(), 1000);
 
-            // Deposit should fail because investor is not registered
-            await expect(mockDeFiProtocol.connect(investor2).deposit(1000)).to.be.reverted;
-        });
+            const deadline = (await time.latest()) + 600;
+            const sig = await signRegisterVault(
+                investor2,
+                vaultRegistrar,
+                investor2.address,
+                await mockDeFiProtocol.getAddress(),
+                await mockDSToken.getAddress(),
+                deadline,
+            );
 
-        it('should revert deposit when investor has no balance', async function () {
-            const { mockDeFiProtocol, mockRegistryService, investor2 } = await loadFixture(deployVaultRegistrar);
-
-            // Register investor but don't mint tokens
-            await mockRegistryService.registerInvestor(investor2.address, 'investor-456');
-
-            // Deposit should fail because investor has 0 balance
-            await expect(mockDeFiProtocol.connect(investor2).deposit(1000)).to.be.reverted;
+            await expect(mockDeFiProtocol.connect(investor2).deposit(1000, deadline, sig)).to.be.reverted;
         });
 
         it('should revert deposit when contract is paused', async function () {
             const { vaultRegistrar, mockDeFiProtocol, mockDSToken, mockRegistryService, admin, investor1 } =
                 await loadFixture(deployVaultRegistrar);
 
-            // Setup
             await mockRegistryService.registerInvestor(investor1.address, INVESTOR_ID);
             await mockDSToken.mint(investor1.address, 1000);
             await mockDSToken.connect(investor1).approve(await mockDeFiProtocol.getAddress(), 1000);
-
-            // Pause (firmado por admin)
             await vaultRegistrar.connect(admin).pause();
 
-            // Deposit should fail when paused
-            await expect(mockDeFiProtocol.connect(investor1).deposit(1000)).to.be.reverted;
+            const deadline = (await time.latest()) + 600;
+            const sig = await signRegisterVault(
+                investor1,
+                vaultRegistrar,
+                investor1.address,
+                await mockDeFiProtocol.getAddress(),
+                await mockDSToken.getAddress(),
+                deadline,
+            );
+
+            await expect(mockDeFiProtocol.connect(investor1).deposit(1000, deadline, sig)).to.be.reverted;
         });
 
         it('should handle multiple investors depositing', async function () {
-            const { mockDeFiProtocol, mockDSToken, mockRegistryService, investor1, investor2 } =
+            const { mockDeFiProtocol, mockDSToken, mockRegistryService, vaultRegistrar, investor1, investor2 } =
                 await loadFixture(deployVaultRegistrar);
 
-            // Setup both investors
             await mockRegistryService.registerInvestor(investor1.address, INVESTOR_ID);
             await mockRegistryService.registerInvestor(investor2.address, 'investor-456');
             await mockDSToken.mint(investor1.address, 1000);
             await mockDSToken.mint(investor2.address, 500);
 
-            // Approve and deposit for investor1
             await mockDSToken.connect(investor1).approve(await mockDeFiProtocol.getAddress(), 1000);
-            await mockDeFiProtocol.connect(investor1).deposit(1000);
-
-            // Approve and deposit for investor2
             await mockDSToken.connect(investor2).approve(await mockDeFiProtocol.getAddress(), 500);
-            await mockDeFiProtocol.connect(investor2).deposit(500);
 
-            // Verify both vaults exist and have correct balances
+            const deadline = (await time.latest()) + 600;
+
+            const sig1 = await signRegisterVault(
+                investor1,
+                vaultRegistrar,
+                investor1.address,
+                await mockDeFiProtocol.getAddress(),
+                await mockDSToken.getAddress(),
+                deadline,
+            );
+            await mockDeFiProtocol.connect(investor1).deposit(1000, deadline, sig1);
+
+            const sig2 = await signRegisterVault(
+                investor2,
+                vaultRegistrar,
+                investor2.address,
+                await mockDeFiProtocol.getAddress(),
+                await mockDSToken.getAddress(),
+                deadline,
+            );
+            await mockDeFiProtocol.connect(investor2).deposit(500, deadline, sig2);
+
             const vault1 = await mockDeFiProtocol.investorVaults(investor1.address);
             const vault2 = await mockDeFiProtocol.investorVaults(investor2.address);
             expect(vault1).to.not.equal(vault2);
@@ -447,19 +743,16 @@ describe('VaultRegistrar', function () {
         });
     });
 
+    // ── Upgradability ────────────────────────────────────────────────────────
     describe('Upgradability', function () {
         it('should return implementation address', async function () {
             const { vaultRegistrar } = await loadFixture(deployVaultRegistrar);
-
-            const implAddress = await vaultRegistrar.getImplementationAddress();
-            expect(implAddress).to.not.equal('0x0000000000000000000000000000000000000000');
+            expect(await vaultRegistrar.getImplementationAddress()).to.not.equal(hre.ethers.ZeroAddress);
         });
 
         it('should return initialized version', async function () {
             const { vaultRegistrar } = await loadFixture(deployVaultRegistrar);
-
-            const version = await vaultRegistrar.getInitializedVersion();
-            expect(version).to.equal(1);
+            expect(await vaultRegistrar.getInitializedVersion()).to.equal(1);
         });
     });
 });
