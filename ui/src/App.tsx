@@ -1,9 +1,14 @@
+import { useState } from 'react';
 import { useAccount } from 'wagmi';
 import { ConnectButton } from './components/ConnectButton';
 import { DepositFlow } from './components/DepositFlow';
+import { RevokePanel } from './components/RevokePanel';
+
+type Tab = 'deposit' | 'revoke';
 
 export default function App() {
     const { isConnected } = useAccount();
+    const [tab, setTab] = useState<Tab>('deposit');
 
     return (
         <div className="min-h-screen bg-gray-950 text-white">
@@ -27,17 +32,67 @@ export default function App() {
                     </div>
                 ) : (
                     <div className="space-y-6">
-                        <div>
-                            <h2 className="text-xl font-semibold">Deposit &amp; Register Vault</h2>
-                            <p className="text-sm text-gray-400 mt-1">
-                                Sign an EIP-712 authorization, approve tokens, then deposit into the mock DeFi
-                                protocol. The protocol will register your vault automatically.
-                            </p>
+                        {/* tabs */}
+                        <div className="flex border-b border-gray-800">
+                            <TabButton active={tab === 'deposit'} onClick={() => setTab('deposit')}>
+                                Deposit &amp; Register
+                            </TabButton>
+                            <TabButton active={tab === 'revoke'} onClick={() => setTab('revoke')}>
+                                Revoke Permission
+                            </TabButton>
                         </div>
-                        <DepositFlow />
+
+                        {tab === 'deposit' && (
+                            <div className="space-y-4">
+                                <div>
+                                    <h2 className="text-xl font-semibold">Deposit &amp; Register Vault</h2>
+                                    <p className="text-sm text-gray-400 mt-1">
+                                        Sign once to grant the DeFi protocol a standing permission. The same signature
+                                        can be reused for any number of vault registrations until you revoke it.
+                                    </p>
+                                </div>
+                                <DepositFlow />
+                            </div>
+                        )}
+
+                        {tab === 'revoke' && (
+                            <div className="space-y-4">
+                                <div>
+                                    <h2 className="text-xl font-semibold">Revoke Operator Permission</h2>
+                                    <p className="text-sm text-gray-400 mt-1">
+                                        Increment your nonce for a specific operator, invalidating any signature they
+                                        currently hold.
+                                    </p>
+                                </div>
+                                <RevokePanel />
+                            </div>
+                        )}
                     </div>
                 )}
             </main>
         </div>
+    );
+}
+
+function TabButton({
+    active,
+    onClick,
+    children,
+}: {
+    active: boolean;
+    onClick: () => void;
+    children: React.ReactNode;
+}) {
+    return (
+        <button
+            onClick={onClick}
+            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                active
+                    ? 'border-indigo-500 text-white'
+                    : 'border-transparent text-gray-500 hover:text-gray-300'
+            }`}
+        >
+            {children}
+        </button>
     );
 }

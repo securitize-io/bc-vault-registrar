@@ -58,6 +58,14 @@ interface IVaultRegistrar is Errors {
     );
 
     /**
+     * @dev Emitted when an investor invalidates a previously granted operator permission
+     * @param investor The investor wallet address
+     * @param operator The operator whose permission was invalidated
+     * @param newNonce The new nonce value (any signature built with the previous nonce is now invalid)
+     */
+    event OperatorPermissionInvalidated(address indexed investor, address indexed operator, uint256 newNonce);
+
+    /**
      * @dev Registers a vault address under an existing investor identity
      * @param vaultAddress The vault address to register
      * @param investorWalletAddress The investor's wallet address
@@ -103,4 +111,18 @@ interface IVaultRegistrar is Errors {
      * @custom:selector 0x69eb0b1b
      */
     function token() external view returns (address);
+
+    /**
+     * @dev Returns the current nonce for an investor-operator pair
+     * @param investor The investor wallet address
+     * @param operator The operator address
+     * @return The current nonce
+     */
+    function operatorNonce(address investor, address operator) external view returns (uint256);
+
+    /**
+     * @dev Invalidates all signatures the caller previously granted to an operator
+     * @param operator The operator address whose permission should be invalidated
+     */
+    function invalidateOperatorPermission(address operator) external;
 }

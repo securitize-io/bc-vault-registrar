@@ -23,7 +23,6 @@ import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/acce
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
-import {NoncesUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/NoncesUpgradeable.sol";
 import {ERC1967Utils} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Utils.sol";
 import {Errors} from "./Errors.sol";
 
@@ -36,8 +35,7 @@ abstract contract BaseVaultRegistrar is
     UUPSUpgradeable,
     PausableUpgradeable,
     AccessControlUpgradeable,
-    EIP712Upgradeable,
-    NoncesUpgradeable
+    EIP712Upgradeable
 {
     /// @dev Service ID for Registry Service in DSToken
     uint256 public constant REGISTRY_SERVICE = 4;
@@ -75,7 +73,6 @@ abstract contract BaseVaultRegistrar is
         __Pausable_init();
         __AccessControl_init();
         __EIP712_init("VaultRegistrar", "1");
-        __Nonces_init();
 
         _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
     }

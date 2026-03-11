@@ -17,7 +17,7 @@ describe('VaultRegistrar', function () {
         token: string,
         deadline: number,
     ): Promise<string> {
-        const nonce = await vaultRegistrar.nonces(investor);
+        const nonce = await vaultRegistrar.operatorNonce(investor, operator);
         const chainId = (await hre.ethers.provider.getNetwork()).chainId;
 
         return signer.signTypedData(
@@ -241,13 +241,13 @@ describe('VaultRegistrar', function () {
             expect(await mockRegistryService.getInvestor(vaults[0].address)).to.equal(INVESTOR_ID);
         });
 
-        it('should increment nonce after successful registration', async function () {
+        it('should NOT increment operatorNonce after successful registration', async function () {
             const { vaultRegistrar, mockDSToken, mockRegistryService, protocol1, investor1, vaults } =
                 await loadFixture(deployVaultRegistrar);
 
             await mockRegistryService.registerInvestor(investor1.address, INVESTOR_ID);
 
-            expect(await vaultRegistrar.nonces(investor1.address)).to.equal(0);
+            expect(await vaultRegistrar.operatorNonce(investor1.address, protocol1.address)).to.equal(0);
 
             const deadline = (await time.latest()) + 600;
             const sig = await signRegisterVault(
@@ -261,7 +261,7 @@ describe('VaultRegistrar', function () {
 
             await vaultRegistrar.connect(protocol1).registerVaultWithSig(vaults[0].address, investor1.address, deadline, sig);
 
-            expect(await vaultRegistrar.nonces(investor1.address)).to.equal(1);
+            expect(await vaultRegistrar.operatorNonce(investor1.address, protocol1.address)).to.equal(0);
         });
 
         it('should revert when signature is expired', async function () {
@@ -285,7 +285,7 @@ describe('VaultRegistrar', function () {
             ).to.be.revertedWithCustomError(vaultRegistrar, 'SignatureExpired');
         });
 
-        it('should revert on replay attack (reusing a consumed signature)', async function () {
+        it('should allow the same signature to be reused for multiple vaults', async function () {
             const { vaultRegistrar, mockDSToken, mockRegistryService, protocol1, investor1, vaults } =
                 await loadFixture(deployVaultRegistrar);
 
@@ -301,13 +301,72 @@ describe('VaultRegistrar', function () {
                 deadline,
             );
 
-            // First use succeeds
+            await vaultRegistrar.connect(protocol1).registerVaultWithSig(vaults[0].address, investor1.address, deadline, sig);
+            await vaultRegistrar.connect(protocol1).registerVaultWithSig(vaults[1].address, investor1.address, deadline, sig);
+
+            expect(await mockRegistryService.getInvestor(vaults[0].address)).to.equal(INVESTOR_ID);
+            expect(await mockRegistryService.getInvestor(vaults[1].address)).to.equal(INVESTOR_ID);
+        });
+
+        it('should revert after investor invalidates operator permission', async function () {
+            const { vaultRegistrar, mockDSToken, mockRegistryService, protocol1, investor1, vaults } =
+                await loadFixture(deployVaultRegistrar);
+
+            await mockRegistryService.registerInvestor(investor1.address, INVESTOR_ID);
+
+            const deadline = (await time.latest()) + 600;
+            const sig = await signRegisterVault(
+                investor1,
+                vaultRegistrar,
+                investor1.address,
+                protocol1.address,
+                await mockDSToken.getAddress(),
+                deadline,
+            );
+
+            // Use the signature once
             await vaultRegistrar.connect(protocol1).registerVaultWithSig(vaults[0].address, investor1.address, deadline, sig);
 
-            // Replay with same signature must fail
+            // Investor revokes operator permission — nonce becomes 1
+            await expect(vaultRegistrar.connect(investor1).invalidateOperatorPermission(protocol1.address))
+                .to.emit(vaultRegistrar, 'OperatorPermissionInvalidated')
+                .withArgs(investor1.address, protocol1.address, 1);
+
+            expect(await vaultRegistrar.operatorNonce(investor1.address, protocol1.address)).to.equal(1);
+
+            // Old sig (built with nonce 0) is now invalid
             await expect(
                 vaultRegistrar.connect(protocol1).registerVaultWithSig(vaults[1].address, investor1.address, deadline, sig),
             ).to.be.revertedWithCustomError(vaultRegistrar, 'InvalidInvestorSignature');
+        });
+
+        it('should only invalidate the targeted operator, not others', async function () {
+            const { vaultRegistrar, mockDSToken, mockRegistryService, admin, protocol1, protocol2, investor1, vaults } =
+                await loadFixture(deployVaultRegistrar);
+
+            await mockRegistryService.registerInvestor(investor1.address, INVESTOR_ID);
+            await vaultRegistrar.connect(admin).addOperator(protocol2.address);
+
+            const deadline = (await time.latest()) + 600;
+            const sig1 = await signRegisterVault(
+                investor1, vaultRegistrar, investor1.address, protocol1.address, await mockDSToken.getAddress(), deadline,
+            );
+            const sig2 = await signRegisterVault(
+                investor1, vaultRegistrar, investor1.address, protocol2.address, await mockDSToken.getAddress(), deadline,
+            );
+
+            // Invalidate only protocol1
+            await vaultRegistrar.connect(investor1).invalidateOperatorPermission(protocol1.address);
+
+            // protocol1's old sig fails
+            await expect(
+                vaultRegistrar.connect(protocol1).registerVaultWithSig(vaults[0].address, investor1.address, deadline, sig1),
+            ).to.be.revertedWithCustomError(vaultRegistrar, 'InvalidInvestorSignature');
+
+            // protocol2's sig still works
+            await expect(
+                vaultRegistrar.connect(protocol2).registerVaultWithSig(vaults[1].address, investor1.address, deadline, sig2),
+            ).to.emit(vaultRegistrar, 'VaultRegistered');
         });
 
         it('should revert when a different operator submits the signature (cross-protocol attack)', async function () {
@@ -485,7 +544,7 @@ describe('VaultRegistrar', function () {
             ).to.be.revertedWithCustomError(vaultRegistrar, 'VaultAlreadyRegistered');
         });
 
-        it('nonce should not be consumed on failed registration', async function () {
+        it('operatorNonce should remain unchanged on failed registration', async function () {
             const { vaultRegistrar, mockDSToken, protocol1, investor1, vaults } =
                 await loadFixture(deployVaultRegistrar);
 
@@ -504,8 +563,37 @@ describe('VaultRegistrar', function () {
                 vaultRegistrar.connect(protocol1).registerVaultWithSig(vaults[0].address, investor1.address, deadline, sig),
             ).to.be.reverted;
 
-            // Nonce must still be 0
-            expect(await vaultRegistrar.nonces(investor1.address)).to.equal(0);
+            expect(await vaultRegistrar.operatorNonce(investor1.address, protocol1.address)).to.equal(0);
+        });
+    });
+
+    // ── invalidateOperatorPermission ────────────────────────────────────────
+    describe('invalidateOperatorPermission', function () {
+        it('should revert when operator address is zero', async function () {
+            const { vaultRegistrar, investor1 } = await loadFixture(deployVaultRegistrar);
+            await expect(
+                vaultRegistrar.connect(investor1).invalidateOperatorPermission(hre.ethers.ZeroAddress),
+            ).to.be.revertedWithCustomError(vaultRegistrar, 'InvalidAddress');
+        });
+
+        it('should allow re-authorization with new signature after invalidation', async function () {
+            const { vaultRegistrar, mockDSToken, mockRegistryService, protocol1, investor1, vaults } =
+                await loadFixture(deployVaultRegistrar);
+
+            await mockRegistryService.registerInvestor(investor1.address, INVESTOR_ID);
+
+            // Investor invalidates — nonce becomes 1
+            await vaultRegistrar.connect(investor1).invalidateOperatorPermission(protocol1.address);
+
+            // Investor signs again with nonce 1
+            const deadline = (await time.latest()) + 600;
+            const sig = await signRegisterVault(
+                investor1, vaultRegistrar, investor1.address, protocol1.address, await mockDSToken.getAddress(), deadline,
+            );
+
+            await expect(
+                vaultRegistrar.connect(protocol1).registerVaultWithSig(vaults[0].address, investor1.address, deadline, sig),
+            ).to.emit(vaultRegistrar, 'VaultRegistered');
         });
     });
 

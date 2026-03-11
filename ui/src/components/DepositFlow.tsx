@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useAccount, useReadContract, useSignTypedData, useWriteContract, useWaitForTransactionReceipt, useChainId, usePublicClient } from 'wagmi';
+import { useAccount, useReadContract, useSignTypedData, useWriteContract, useChainId, usePublicClient } from 'wagmi';
 import { parseUnits, formatUnits, type Hex, ContractFunctionRevertedError } from 'viem';
 import { CONTRACT_ADDRESSES } from '../wagmi.config';
 import { VaultRegistrarAbi } from '../abis/VaultRegistrar';
@@ -26,15 +26,19 @@ export function DepositFlow() {
     const [step, setStep] = useState<FlowStep>('input');
     const [deadline, setDeadline] = useState<number>(0);
     const [signature, setSignature] = useState<Hex | null>(null);
+    // Nonce that was used when the current signature was built
+    const [nonceAtSign, setNonceAtSign] = useState<bigint | null>(null);
     const [result, setResult] = useState<TxResult | null>(null);
     const [error, setError] = useState<string | null>(null);
+    // True while waiting for the tx receipt after submission
+    const [isWaitingReceipt, setIsWaitingReceipt] = useState(false);
 
     // ── reads ──────────────────────────────────────────────────────────────
-    const { data: nonce } = useReadContract({
+    const { data: operatorNonce, refetch: refetchNonce } = useReadContract({
         address: CONTRACT_ADDRESSES.vaultRegistrar,
         abi: VaultRegistrarAbi,
-        functionName: 'nonces',
-        args: [investor!],
+        functionName: 'operatorNonce',
+        args: [investor!, CONTRACT_ADDRESSES.mockDeFiProtocol],
         query: { enabled: !!investor },
     });
 
@@ -74,9 +78,6 @@ export function DepositFlow() {
     // ── write contracts ────────────────────────────────────────────────────
     const { writeContractAsync: approveAsync, isPending: isApproving } = useWriteContract();
     const { writeContractAsync: depositAsync, isPending: isDepositing } = useWriteContract();
-    const { isLoading: isWaitingTx } = useWaitForTransactionReceipt({
-        hash: result?.hash,
-    });
 
     const dec = decimals ?? 6;
     const parsedAmount = amount ? parseUnits(amount, dec) : 0n;
@@ -85,10 +86,27 @@ export function DepositFlow() {
     const vaultAlreadyExists =
         existingVault && existingVault !== '0x0000000000000000000000000000000000000000';
 
+    // Signature is still valid when it exists and was built with the current nonce
+    const sigIsValid =
+        signature !== null &&
+        nonceAtSign !== null &&
+        operatorNonce !== undefined &&
+        nonceAtSign === operatorNonce;
+
+    // Full reset — clears everything including signature
     function reset() {
         setStep('input');
         setSignature(null);
+        setNonceAtSign(null);
         setDeadline(0);
+        setResult(null);
+        setError(null);
+        setAmount('');
+    }
+
+    // Partial reset — keeps signature so it can be reused
+    function resetForNextDeposit() {
+        setStep('input');
         setResult(null);
         setError(null);
         setAmount('');
@@ -96,7 +114,7 @@ export function DepositFlow() {
 
     // ── step handlers ──────────────────────────────────────────────────────
     async function handleSign() {
-        if (!investor || nonce === undefined) return;
+        if (!investor || operatorNonce === undefined) return;
         setError(null);
 
         const dl = Math.floor(Date.now() / 1000) + DEADLINE_SECONDS;
@@ -124,11 +142,12 @@ export function DepositFlow() {
                     investor,
                     operator: CONTRACT_ADDRESSES.mockDeFiProtocol,
                     token: CONTRACT_ADDRESSES.mockDSToken,
-                    nonce,
+                    nonce: operatorNonce,
                     deadline: BigInt(dl),
                 },
             });
             setSignature(sig);
+            setNonceAtSign(operatorNonce);
             setStep('approve');
         } catch (e: unknown) {
             setError(e instanceof Error ? e.message : 'Signing rejected');
@@ -164,7 +183,6 @@ export function DepositFlow() {
         } as const;
 
         try {
-            // Simulate first to surface revert reasons before sending tx
             await publicClient.simulateContract(callArgs);
         } catch (e: unknown) {
             if (e instanceof ContractFunctionRevertedError) {
@@ -178,19 +196,23 @@ export function DepositFlow() {
         try {
             const hash = await depositAsync(callArgs);
 
-            // Wait for the tx to be confirmed before reading on-chain state
-            await publicClient.waitForTransactionReceipt({ hash });
+            setIsWaitingReceipt(true);
+            try {
+                await publicClient.waitForTransactionReceipt({ hash });
 
-            const vault = await publicClient.readContract({
-                address: CONTRACT_ADDRESSES.mockDeFiProtocol,
-                abi: MockDeFiProtocolAbi,
-                functionName: 'investorVaults',
-                args: [investor as `0x${string}`],
-            });
+                const vault = await publicClient.readContract({
+                    address: CONTRACT_ADDRESSES.mockDeFiProtocol,
+                    abi: MockDeFiProtocolAbi,
+                    functionName: 'investorVaults',
+                    args: [investor as `0x${string}`],
+                });
 
-            await refetchBalance();
-            setResult({ hash, vaultAddress: vault as string });
-            setStep('done');
+                await Promise.all([refetchBalance(), refetchNonce()]);
+                setResult({ hash, vaultAddress: vault as string });
+                setStep('done');
+            } finally {
+                setIsWaitingReceipt(false);
+            }
         } catch (e: unknown) {
             setError(e instanceof Error ? e.message : 'Deposit failed');
         }
@@ -215,11 +237,34 @@ export function DepositFlow() {
             <div className="grid grid-cols-2 gap-3 text-sm">
                 <InfoRow label="Investor" value={investor ?? '—'} mono />
                 <InfoRow label="DSToken balance" value={`${formattedBalance} tokens`} />
-                <InfoRow label="Nonce" value={nonce !== undefined ? nonce.toString() : '…'} />
+                <InfoRow
+                    label="Operator nonce"
+                    value={operatorNonce !== undefined ? operatorNonce.toString() : '…'}
+                />
                 {vaultAlreadyExists && (
                     <InfoRow label="Existing vault" value={existingVault as string} mono />
                 )}
             </div>
+
+            {/* standing permission banner */}
+            {sigIsValid && step === 'input' && (
+                <div className="rounded-lg bg-indigo-950 border border-indigo-600 px-4 py-3 space-y-1">
+                    <p className="text-sm font-medium text-indigo-300">Standing permission active</p>
+                    <p className="text-xs text-indigo-400">
+                        You already signed a permission for this operator. You can deposit again without re-signing.
+                    </p>
+                    <p className="text-xs font-mono text-indigo-500 break-all">{signature}</p>
+                </div>
+            )}
+
+            {/* stale signature warning */}
+            {signature !== null && !sigIsValid && step === 'input' && (
+                <div className="rounded-lg bg-yellow-950 border border-yellow-700 px-4 py-3">
+                    <p className="text-sm text-yellow-400">
+                        Your previous signature was invalidated (nonce changed). You need to sign again.
+                    </p>
+                </div>
+            )}
 
             {/* ── step: input ── */}
             {step === 'input' && (
@@ -244,6 +289,18 @@ export function DepositFlow() {
                                 Continue to Approve
                             </ActionButton>
                         </div>
+                    ) : sigIsValid ? (
+                        <div className="space-y-2">
+                            <ActionButton onClick={() => setStep('approve')} disabled={!parsedAmount}>
+                                Use existing signature → Approve
+                            </ActionButton>
+                            <button
+                                onClick={() => setStep('sign')}
+                                className="w-full py-2 text-sm text-gray-400 hover:text-gray-200 transition-colors"
+                            >
+                                Re-sign instead
+                            </button>
+                        </div>
                     ) : (
                         <ActionButton onClick={() => setStep('sign')} disabled={!parsedAmount}>
                             Continue to Sign
@@ -256,15 +313,16 @@ export function DepositFlow() {
             {step === 'sign' && (
                 <div className="space-y-4">
                     <p className="text-sm text-gray-400">
-                        Your wallet will prompt you to sign the following EIP-712 typed data. This authorizes the
-                        DeFi protocol to register a vault under your identity.
+                        Your wallet will prompt you to sign the following EIP-712 typed data. This grants the DeFi
+                        protocol a <span className="text-white">standing permission</span> to register vaults on your
+                        behalf — the same signature can be reused for future deposits until you revoke it.
                     </p>
-                    {nonce !== undefined && (
+                    {operatorNonce !== undefined && (
                         <TypedDataDisplay
                             investor={investor!}
                             operator={CONTRACT_ADDRESSES.mockDeFiProtocol}
                             token={CONTRACT_ADDRESSES.mockDSToken}
-                            nonce={nonce.toString()}
+                            nonce={operatorNonce.toString()}
                             deadline={Math.floor(Date.now() / 1000) + DEADLINE_SECONDS}
                             verifyingContract={CONTRACT_ADDRESSES.vaultRegistrar}
                             chainId={chainId}
@@ -310,8 +368,8 @@ export function DepositFlow() {
                         Ready to deposit. The protocol will create a vault (if needed), call{' '}
                         <code className="text-indigo-400">registerVaultWithSig</code>, and transfer your tokens.
                     </p>
-                    <ActionButton onClick={handleDeposit} loading={isDepositing || isWaitingTx}>
-                        {isWaitingTx ? 'Waiting for confirmation…' : `Deposit ${amount} tokens`}
+                    <ActionButton onClick={handleDeposit} loading={isDepositing || isWaitingReceipt}>
+                        {isDepositing ? 'Confirm in wallet…' : isWaitingReceipt ? 'Waiting for confirmation…' : `Deposit ${amount} tokens`}
                     </ActionButton>
                 </div>
             )}
@@ -324,9 +382,20 @@ export function DepositFlow() {
                         <InfoRow label="Tx hash" value={result.hash} mono />
                         <InfoRow label="Vault address" value={result.vaultAddress} mono />
                     </div>
-                    <button onClick={reset} className="text-sm text-indigo-400 hover:text-indigo-300">
-                        Start new deposit →
-                    </button>
+                    <div className="rounded-lg bg-indigo-950 border border-indigo-700 px-4 py-3 text-sm text-indigo-300">
+                        Your signature is still valid — you can deposit again without re-signing.
+                    </div>
+                    <div className="flex gap-3">
+                        <ActionButton onClick={resetForNextDeposit}>
+                            Deposit again
+                        </ActionButton>
+                        <button
+                            onClick={reset}
+                            className="flex-1 py-3 px-4 rounded-lg border border-gray-600 hover:border-gray-400 text-gray-400 hover:text-white text-sm font-medium transition-colors"
+                        >
+                            Start fresh
+                        </button>
+                    </div>
                 </div>
             )}
 

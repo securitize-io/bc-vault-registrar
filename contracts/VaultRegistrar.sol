@@ -39,6 +39,9 @@ contract VaultRegistrar is IVaultRegistrar, BaseVaultRegistrar {
     /// @dev The token address this vault registrar is associated with
     address public token;
 
+    /// @dev Per-investor, per-operator nonces for EIP-712 signature invalidation
+    mapping(address investor => mapping(address operator => uint256 nonce)) private _operatorNonces;
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -72,6 +75,16 @@ contract VaultRegistrar is IVaultRegistrar, BaseVaultRegistrar {
      * @param investorWalletAddress The investor's wallet address (signer)
      * @param deadline Unix timestamp after which the signature is invalid
      * @param signature EIP-712 signature — supports EOA (ECDSA) and smart contract wallets (ERC-1271)
+     *
+     * @notice The nonce is intentionally NOT incremented after a successful registration.
+     *         The signature acts as a standing permission: the investor signs once and the
+     *         operator can reuse the same signature to register any number of vaults on their
+     *         behalf, for as long as the deadline has not passed.
+     *
+     *         To revoke access, the investor calls {invalidateOperatorPermission}, which
+     *         increments the per-operator nonce and renders any previously issued signature
+     *         invalid. Revoking one operator's permission does not affect nonces for other
+     *         operators.
      */
     function registerVaultWithSig(
         address vaultAddress,
@@ -88,7 +101,7 @@ contract VaultRegistrar is IVaultRegistrar, BaseVaultRegistrar {
                     investorWalletAddress,
                     _msgSender(),
                     token,
-                    nonces(investorWalletAddress),
+                    _operatorNonces[investorWalletAddress][_msgSender()],
                     deadline
                 )
             )
@@ -97,8 +110,6 @@ contract VaultRegistrar is IVaultRegistrar, BaseVaultRegistrar {
         if (!SignatureChecker.isValidSignatureNow(investorWalletAddress, digest, signature)) {
             revert InvalidInvestorSignature();
         }
-
-        _useNonce(investorWalletAddress);
 
         _registerVaultInternal(vaultAddress, investorWalletAddress);
     }
@@ -138,6 +149,27 @@ contract VaultRegistrar is IVaultRegistrar, BaseVaultRegistrar {
         address /* investorWalletAddress */
     ) external pure {
         revert NotImplemented();
+    }
+
+    /**
+     * @dev Returns the current nonce for an investor-operator pair
+     * @param investor The investor wallet address
+     * @param operator The operator address
+     * @return The current nonce
+     */
+    function operatorNonce(address investor, address operator) external view returns (uint256) {
+        return _operatorNonces[investor][operator];
+    }
+
+    /**
+     * @dev Invalidates all signatures the investor previously granted to an operator
+     * @notice Increments the nonce for the caller-operator pair, rendering any existing
+     *         signatures built with the previous nonce invalid
+     * @param operator The operator address whose permission should be invalidated
+     */
+    function invalidateOperatorPermission(address operator) external notZeroAddress(operator) {
+        uint256 newNonce = ++_operatorNonces[_msgSender()][operator];
+        emit OperatorPermissionInvalidated(_msgSender(), operator, newNonce);
     }
 
     /**
