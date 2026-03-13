@@ -1,4 +1,14 @@
+<div align="center">
+  <img src="https://s3.us-east-2.amazonaws.com/securitize-public-files/securitize_logo+medium.png" alt="Securitize" width="200px"/>
+
 # Securitize VaultRegistrar Smart Contract
+
+**Cross-chain bridge infrastructure for DS Tokens and USDC transfers**
+
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Solidity](https://img.shields.io/badge/Solidity-0.8.24-blue.svg)](https://soliditylang.org/)
+[![Hardhat](https://img.shields.io/badge/Built%20with-Hardhat-yellow.svg)](https://hardhat.org/)
+</div>
 
 An intermediary contract that allows authorized DeFi protocols to register vault addresses under existing investor identities, maintaining compliance with Securitize's KYC requirements while enabling segregated custody for DeFi use cases.
 
@@ -192,6 +202,17 @@ npm run dev
 
 The UI allows an investor to sign the EIP-712 typed data once, reuse that signature across multiple deposits, and revoke operator permission — covering the full `registerVault` standing-permission flow.
 
-## License
+## 📄 License & support
 
-Apache-2.0
+This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
+
+**Support**
+
+For technical support and questions:
+
+- 📧 Email: [joaquin.larranaga@securitize.io](mailto:joaquin.larranaga@securitize.io)
+---
+
+<div align="center">
+  <strong>Built by the Securitize Team</strong>
+</div>
