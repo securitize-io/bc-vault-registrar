@@ -51,6 +51,3 @@ ignition/deployments/
 
 # Claude Code
 .claude/
-
-# Design docs
-docs/

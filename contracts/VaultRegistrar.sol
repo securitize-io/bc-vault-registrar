@@ -60,18 +60,6 @@ contract VaultRegistrar is IVaultRegistrar, BaseVaultRegistrar {
     /**
      * @dev Registers a vault address under an existing investor identity
      * @param vaultAddress The vault address to register
-     * @param investorWalletAddress The investor's wallet address
-     */
-    function registerVault(
-        address vaultAddress,
-        address investorWalletAddress
-    ) external whenNotPaused onlyRole(OPERATOR_ROLE) notZeroAddress(vaultAddress) notZeroAddress(investorWalletAddress) {
-        _registerVaultInternal(vaultAddress, investorWalletAddress);
-    }
-
-    /**
-     * @dev Registers a vault with explicit investor consent via EIP-712 signature
-     * @param vaultAddress The vault address to register
      * @param investorWalletAddress The investor's wallet address (signer)
      * @param deadline Unix timestamp after which the signature is invalid
      * @param signature EIP-712 signature — supports EOA (ECDSA) and smart contract wallets (ERC-1271)
@@ -86,7 +74,7 @@ contract VaultRegistrar is IVaultRegistrar, BaseVaultRegistrar {
      *         invalid. Revoking one operator's permission does not affect nonces for other
      *         operators.
      */
-    function registerVaultWithSig(
+    function registerVault(
         address vaultAddress,
         address investorWalletAddress,
         uint256 deadline,
@@ -186,7 +174,7 @@ contract VaultRegistrar is IVaultRegistrar, BaseVaultRegistrar {
     }
 
     /**
-     * @dev Core registration logic shared by registerVault and registerVaultWithSig
+     * @dev Core registration logic — validates investor identity and adds the vault to the registry
      * @param vaultAddress The vault address to register
      * @param investorWalletAddress The investor's wallet address
      */

@@ -32,8 +32,9 @@ The VaultRegistrar contract enables authorized protocols (with `OPERATOR_ROLE`) 
 - **One DSToken per VaultRegistrar**: Each deployment is tied to a specific DSToken
 - **Role-Based Access Control**: Uses OpenZeppelin's AccessControl for managing operators
 - **OPERATOR_ROLE**: Protocols with `OPERATOR_ROLE` can register vaults
-- **EIP-712 Investor Consent**: `registerVaultWithSig` requires a valid investor signature — supports EOA and ERC-1271 smart contract wallets
-- **Replay Protection**: Per-investor nonce (OZ `NoncesUpgradeable`) and deadline prevent signature reuse
+- **EIP-712 Investor Consent**: `registerVault` requires a valid investor signature — supports EOA and ERC-1271 smart contract wallets
+- **Standing Permission**: One signature authorizes the operator for any number of vault registrations until the investor revokes it via `invalidateOperatorPermission`
+- **Per-Operator Nonce**: Each investor-operator pair tracks its own nonce — revoking one operator does not affect others
 - **Vault Registration**: Registers vault addresses under investor identities
 - **Pausable**: Contract can be paused by admin for emergency situations
 - **Upgradeable**: Uses UUPS proxy pattern for upgradeability
@@ -100,18 +101,8 @@ This will deploy the MockDeFiProtocol contract for testing purposes. The task wi
 ### `initialize(address _token)`
 Initializes the contract with the token address.
 
-### `registerVault(address vaultAddress, address investorWalletAddress)`
-Registers a vault address under an existing investor identity.
-
-**Requirements:**
-- Caller must have `OPERATOR_ROLE`
-- Investor wallet must be registered in RegistryService
-- Vault must not already be registered
-- Contract must not be paused
-- Both addresses must not be zero address
-
-### `registerVaultWithSig(address vaultAddress, address investorWalletAddress, uint256 deadline, bytes calldata signature)`
-Registers a vault with explicit investor consent via EIP-712 signature. This is the standard path for DeFi protocol operators.
+### `registerVault(address vaultAddress, address investorWalletAddress, uint256 deadline, bytes calldata signature)`
+Registers a vault under an investor identity via EIP-712 signature. The signature is a **standing permission** — the operator can reuse it for any number of vault registrations until the deadline passes or the investor calls `invalidateOperatorPermission`.
 
 **Requirements:**
 - Caller must have `OPERATOR_ROLE`
@@ -126,6 +117,7 @@ Registers a vault with explicit investor consent via EIP-712 signature. This is 
 ```
 domain:  { name: "VaultRegistrar", version: "1", chainId, verifyingContract }
 type:    RegisterVault(address investor, address operator, address token, uint256 nonce, uint256 deadline)
+nonce:   operatorNonce(investor, operator)  — per-operator, only increments on invalidateOperatorPermission
 ```
 
 ### `isRegistered(address vaultAddress, address investorWalletAddress)`
@@ -136,8 +128,11 @@ Checks if a vault is registered for an investor.
 ### `unregisterVault(address vaultAddress, address investorWalletAddress)`
 Currently not implemented — reverts with `NotImplemented`.
 
-### `nonces(address investor)`
-Returns the current nonce for an investor. Used to construct the EIP-712 typed data before signing.
+### `operatorNonce(address investor, address operator)`
+Returns the current nonce for an investor-operator pair. Used to construct the EIP-712 typed data before signing.
+
+### `invalidateOperatorPermission(address operator)`
+Increments the caller's nonce for the given operator, invalidating any signature previously issued to them. Only affects the caller-operator pair — other operators are unaffected.
 
 ### `token()`
 Returns the DSToken address associated with this vault registrar.
@@ -161,6 +156,9 @@ Emergency pause controls. Admin only.
 
 - `VaultUnregistered(address indexed investor, address indexed vault, address token, string investorId, address indexed sender)`
   — Emitted when a vault registration is revoked.
+
+- `OperatorPermissionInvalidated(address indexed investor, address indexed operator, uint256 newNonce)`
+  — Emitted when an investor revokes a previously granted operator permission.
 
 - `ProtocolAuthorized(address indexed protocol)` — Emitted when `OPERATOR_ROLE` is granted.
 - `ProtocolRevoked(address indexed protocol)` — Emitted when `OPERATOR_ROLE` is revoked.
@@ -192,7 +190,7 @@ npm install
 npm run dev
 ```
 
-The UI allows an investor to sign the EIP-712 typed data, approve tokens, and simulate a deposit through the MockDeFiProtocol — covering the end-to-end `registerVaultWithSig` flow.
+The UI allows an investor to sign the EIP-712 typed data once, reuse that signature across multiple deposits, and revoke operator permission — covering the full `registerVault` standing-permission flow.
 
 ## License
 

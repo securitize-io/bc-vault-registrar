@@ -31,7 +31,7 @@ interface IVaultRegistrar is Errors {
      * @param vault The vault address that was registered
      * @param token The token address
      * @param investorId The investor ID
-     * @param sender The address that called the registerVault function
+     * @param sender The operator address that called registerVault
      */
     event VaultRegistered(
         address indexed investor,
@@ -68,20 +68,11 @@ interface IVaultRegistrar is Errors {
     /**
      * @dev Registers a vault address under an existing investor identity
      * @param vaultAddress The vault address to register
-     * @param investorWalletAddress The investor's wallet address
-     * @custom:selector 0x05c4fdf9
-     */
-    function registerVault(address vaultAddress, address investorWalletAddress) external;
-
-    /**
-     * @dev Registers a vault with explicit investor consent via EIP-712 signature
-     * @param vaultAddress The vault address to register
      * @param investorWalletAddress The investor's wallet address (signer)
      * @param deadline Unix timestamp after which the signature is invalid
      * @param signature EIP-712 signature — supports EOA (ECDSA) and smart contract wallets (ERC-1271)
-     * @custom:selector 0xa4b6aee0
      */
-    function registerVaultWithSig(
+    function registerVault(
         address vaultAddress,
         address investorWalletAddress,
         uint256 deadline,

@@ -40,7 +40,7 @@ abstract contract BaseVaultRegistrar is
     /// @dev Service ID for Registry Service in DSToken
     uint256 public constant REGISTRY_SERVICE = 4;
 
-    /// @dev Role for operators who can call registerVaultWithSig
+    /// @dev Role for operators who can call registerVault
     bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
 
     /// @dev Emitted when a protocol is authorized as an operator

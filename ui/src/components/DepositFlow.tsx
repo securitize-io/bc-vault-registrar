@@ -366,7 +366,7 @@ export function DepositFlow() {
                 <div className="space-y-4">
                     <p className="text-sm text-gray-400">
                         Ready to deposit. The protocol will create a vault (if needed), call{' '}
-                        <code className="text-indigo-400">registerVaultWithSig</code>, and transfer your tokens.
+                        <code className="text-indigo-400">registerVault</code>, and transfer your tokens.
                     </p>
                     <ActionButton onClick={handleDeposit} loading={isDepositing || isWaitingReceipt}>
                         {isDepositing ? 'Confirm in wallet…' : isWaitingReceipt ? 'Waiting for confirmation…' : `Deposit ${amount} tokens`}

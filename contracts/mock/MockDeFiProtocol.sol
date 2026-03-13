@@ -49,7 +49,7 @@ contract MockDeFiProtocol {
         if (vault == address(0)) {
             vault = deployVault();
             investorVaults[msg.sender] = vault;
-            vaultRegistrar.registerVaultWithSig(vault, msg.sender, deadline, signature);
+            vaultRegistrar.registerVault(vault, msg.sender, deadline, signature);
             emit VaultCreated(msg.sender, vault);
         }
 
