@@ -46,4 +46,8 @@ interface Errors {
     /// @notice Thrown when the investor signature is invalid or does not match
     /// @custom:selector 0xac94b822
     error InvalidInvestorSignature();
+
+    /// @notice Thrown when invalidateOperatorPermission is called for an address that does not hold OPERATOR_ROLE
+    /// @custom:selector 0x308e16dd
+    error NotAnOperator(address account);
 }

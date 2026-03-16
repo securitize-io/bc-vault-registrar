@@ -113,7 +113,8 @@ interface IVaultRegistrar is Errors {
 
     /**
      * @dev Invalidates all signatures the caller previously granted to an operator
-     * @param operator The operator address whose permission should be invalidated
+     * @param operator The operator address whose permission should be invalidated.
+     *        Must currently hold OPERATOR_ROLE — reverts with {NotAnOperator} otherwise.
      */
     function invalidateOperatorPermission(address operator) external;
 }
