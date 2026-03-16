@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/main.tsx","./src/vite-env.d.ts","./src/wagmi.config.ts","./src/abis/mockdstoken.ts","./src/abis/mockdefiprotocol.ts","./src/abis/vaultregistrar.ts","./src/components/connectbutton.tsx","./src/components/depositflow.tsx","./src/components/step.tsx","./src/components/typeddatadisplay.tsx"],"version":"5.9.3"}

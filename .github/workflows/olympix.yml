@@ -1,0 +1,35 @@
+name: Olympix Security Scan
+
+on:
+  pull_request:
+    branches:
+      - master
+      - dev
+    paths:
+      - 'contracts/**'
+
+permissions:
+  contents: read
+  security-events: write   # required to upload SARIF to GitHub Code Scanning
+
+jobs:
+  olympix:
+    name: Static Analysis
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run Olympix Integrated Security
+        uses: olympix/integrated-security@main
+        env:
+          OLYMPIX_API_TOKEN: ${{ secrets.OLYMPIX_API_TOKEN }}
+        with:
+          args: -p contracts -f sarif -o .
+
+      - name: Upload results to GitHub Code Scanning
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: olympix.sarif
