@@ -100,6 +100,8 @@ contract VaultRegistrar is IVaultRegistrar, BaseVaultRegistrar {
         }
 
         _registerVaultInternal(vaultAddress, investorWalletAddress);
+
+        emit InvestorSignatureVerified(investorWalletAddress, vaultAddress, deadline);
     }
 
     /**
@@ -199,7 +201,6 @@ contract VaultRegistrar is IVaultRegistrar, BaseVaultRegistrar {
             _validateVaultBelongsToInvestor(vaultAddress, vaultInvestorId, investorId);
             revert VaultAlreadyRegistered(vaultAddress);
         }
-
 
         registryService.addWallet(vaultAddress, investorId);
 
