@@ -101,7 +101,7 @@ contract VaultRegistrar is IVaultRegistrar, BaseVaultRegistrar {
 
         _registerVaultInternal(vaultAddress, investorWalletAddress);
 
-        emit InvestorSignatureVerified(investorWalletAddress, vaultAddress, deadline);
+        emit InvestorSignatureVerified(investorWalletAddress, vaultAddress, deadline, signature);
     }
 
     /**
