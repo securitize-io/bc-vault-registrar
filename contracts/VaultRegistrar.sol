@@ -82,14 +82,17 @@ contract VaultRegistrar is IVaultRegistrar, BaseVaultRegistrar {
     ) external whenNotPaused onlyRole(OPERATOR_ROLE) notZeroAddress(vaultAddress) notZeroAddress(investorWalletAddress) {
         if (block.timestamp >= deadline) revert SignatureExpired();
 
+        address operator = _msgSender();
+        uint256 nonce = _operatorNonces[investorWalletAddress][operator];
+
         bytes32 digest = _hashTypedDataV4(
             keccak256(
                 abi.encode(
                     REGISTER_TYPEHASH,
                     investorWalletAddress,
-                    _msgSender(),
+                    operator,
                     token,
-                    _operatorNonces[investorWalletAddress][_msgSender()],
+                    nonce,
                     deadline
                 )
             )
@@ -101,7 +104,7 @@ contract VaultRegistrar is IVaultRegistrar, BaseVaultRegistrar {
 
         _registerVaultInternal(vaultAddress, investorWalletAddress);
 
-        emit InvestorSignatureVerified(investorWalletAddress, vaultAddress, deadline, signature);
+        emit InvestorSignatureVerified(investorWalletAddress, operator, nonce, deadline, signature);
     }
 
     /**

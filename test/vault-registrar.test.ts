@@ -161,7 +161,7 @@ describe('VaultRegistrar', function () {
                 .to.emit(vaultRegistrar, 'VaultRegistered')
                 .withArgs(investor1.address, vaults[0].address, await mockDSToken.getAddress(), INVESTOR_ID, protocol1.address)
                 .and.to.emit(vaultRegistrar, 'InvestorSignatureVerified')
-                .withArgs(investor1.address, vaults[0].address, deadline, sig);
+                .withArgs(investor1.address, protocol1.address, 0, deadline, sig);
 
             expect(await mockRegistryService.getInvestor(vaults[0].address)).to.equal(INVESTOR_ID);
         });
