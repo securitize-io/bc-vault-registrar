@@ -66,6 +66,15 @@ interface IVaultRegistrar is Errors {
     event OperatorPermissionInvalidated(address indexed investor, address indexed operator, uint256 newNonce);
 
     /**
+     * @dev Emitted when an investor signature is successfully verified during vault registration
+     * @param investor The investor wallet address whose signature was verified
+     * @param vault The vault address being registered
+     * @param deadline The expiration timestamp of the signature
+     * @param signature The raw EIP-712 signature bytes provided by the operator
+     */
+    event InvestorSignatureVerified(address indexed investor, address indexed vault, uint256 deadline, bytes signature);
+
+    /**
      * @dev Registers a vault address under an existing investor identity
      * @param vaultAddress The vault address to register
      * @param investorWalletAddress The investor's wallet address (signer)

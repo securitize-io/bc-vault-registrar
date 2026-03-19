@@ -159,7 +159,9 @@ describe('VaultRegistrar', function () {
                 vaultRegistrar.connect(protocol1).registerVault(vaults[0].address, investor1.address, deadline, sig),
             )
                 .to.emit(vaultRegistrar, 'VaultRegistered')
-                .withArgs(investor1.address, vaults[0].address, await mockDSToken.getAddress(), INVESTOR_ID, protocol1.address);
+                .withArgs(investor1.address, vaults[0].address, await mockDSToken.getAddress(), INVESTOR_ID, protocol1.address)
+                .and.to.emit(vaultRegistrar, 'InvestorSignatureVerified')
+                .withArgs(investor1.address, vaults[0].address, deadline, sig);
 
             expect(await mockRegistryService.getInvestor(vaults[0].address)).to.equal(INVESTOR_ID);
         });
@@ -382,7 +384,7 @@ describe('VaultRegistrar', function () {
         });
 
         it('should revert when investor address is zero', async function () {
-            const { vaultRegistrar, mockDSToken, protocol1 } = await loadFixture(deployVaultRegistrar);
+            const { vaultRegistrar, protocol1 } = await loadFixture(deployVaultRegistrar);
 
             const deadline = (await time.latest()) + 600;
             const fakeSig = '0x' + '00'.repeat(65);
