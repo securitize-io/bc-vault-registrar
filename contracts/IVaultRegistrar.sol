@@ -68,11 +68,18 @@ interface IVaultRegistrar is Errors {
     /**
      * @dev Emitted when an investor signature is successfully verified during vault registration
      * @param investor The investor wallet address whose signature was verified
-     * @param vault The vault address being registered
+     * @param operator The operator address that submitted the signature
+     * @param nonce The per-operator nonce bound to the signature
      * @param deadline The expiration timestamp of the signature
      * @param signature The raw EIP-712 signature bytes provided by the operator
      */
-    event InvestorSignatureVerified(address indexed investor, address indexed vault, uint256 deadline, bytes signature);
+    event InvestorSignatureVerified(
+        address indexed investor,
+        address indexed operator,
+        uint256 nonce,
+        uint256 deadline,
+        bytes signature
+    );
 
     /**
      * @dev Registers a vault address under an existing investor identity
