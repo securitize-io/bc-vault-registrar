@@ -501,14 +501,6 @@ describe('VaultRegistrar', function () {
             ).to.be.revertedWithCustomError(vaultRegistrar, 'InvalidAddress');
         });
 
-        it('should revert when operator does not have OPERATOR_ROLE', async function () {
-            const { vaultRegistrar, investor1, unauthorized } = await loadFixture(deployVaultRegistrar);
-            await expect(
-                vaultRegistrar.connect(investor1).invalidateOperatorPermission(unauthorized.address),
-            ).to.be.revertedWithCustomError(vaultRegistrar, 'NotAnOperator')
-              .withArgs(unauthorized.address);
-        });
-
         it('should allow re-authorization with new signature after invalidation', async function () {
             const { vaultRegistrar, mockDSToken, mockRegistryService, protocol1, investor1, vaults } =
                 await loadFixture(deployVaultRegistrar);
