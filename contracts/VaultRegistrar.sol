@@ -80,7 +80,7 @@ contract VaultRegistrar is IVaultRegistrar, BaseVaultRegistrar {
         uint256 deadline,
         bytes calldata signature
     ) external whenNotPaused onlyRole(OPERATOR_ROLE) notZeroAddress(vaultAddress) notZeroAddress(investorWalletAddress) {
-        if (block.timestamp >= deadline) revert SignatureExpired();
+        if (block.timestamp > deadline) revert SignatureExpired();
 
         address operator = _msgSender();
         uint256 nonce = _operatorNonces[investorWalletAddress][operator];
@@ -128,7 +128,9 @@ contract VaultRegistrar is IVaultRegistrar, BaseVaultRegistrar {
             return false;
         }
 
-        _validateVaultBelongsToInvestor(vaultAddress, vaultInvestorId, investorId);
+        if (keccak256(bytes(vaultInvestorId)) != keccak256(bytes(investorId))) {
+            return false;
+        }
 
         return true;
     }
@@ -158,13 +160,9 @@ contract VaultRegistrar is IVaultRegistrar, BaseVaultRegistrar {
      * @dev Invalidates all signatures the investor previously granted to an operator
      * @notice Increments the nonce for the caller-operator pair, rendering any existing
      *         signatures built with the previous nonce invalid.
-     *         Reverts if `operator` does not currently hold OPERATOR_ROLE — a non-operator
-     *         cannot call registerVault regardless, so revoking them has no effect and
-     *         would only pollute state with misleading events.
      * @param operator The operator address whose permission should be invalidated
      */
     function invalidateOperatorPermission(address operator) external notZeroAddress(operator) {
-        if (!hasRole(OPERATOR_ROLE, operator)) revert NotAnOperator(operator);
         uint256 newNonce = ++_operatorNonces[_msgSender()][operator];
         emit OperatorPermissionInvalidated(_msgSender(), operator, newNonce);
     }
