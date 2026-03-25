@@ -80,7 +80,7 @@ contract VaultRegistrar is IVaultRegistrar, BaseVaultRegistrar {
         uint256 deadline,
         bytes calldata signature
     ) external whenNotPaused onlyRole(OPERATOR_ROLE) notZeroAddress(vaultAddress) notZeroAddress(investorWalletAddress) {
-        if (block.timestamp >= deadline) revert SignatureExpired();
+        if (block.timestamp > deadline) revert SignatureExpired();
 
         address operator = _msgSender();
         uint256 nonce = _operatorNonces[investorWalletAddress][operator];
