@@ -128,7 +128,9 @@ contract VaultRegistrar is IVaultRegistrar, BaseVaultRegistrar {
             return false;
         }
 
-        _validateVaultBelongsToInvestor(vaultAddress, vaultInvestorId, investorId);
+        if (keccak256(bytes(vaultInvestorId)) != keccak256(bytes(investorId))) {
+            return false;
+        }
 
         return true;
     }

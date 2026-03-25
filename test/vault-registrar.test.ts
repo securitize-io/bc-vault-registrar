@@ -550,7 +550,7 @@ describe('VaultRegistrar', function () {
             expect(await vaultRegistrar.isRegistered(vaults[0].address, investor1.address)).to.be.false;
         });
 
-        it('should revert with VaultBelongsToDifferentInvestor when vault belongs to different investor', async function () {
+        it('should return false when vault belongs to different investor', async function () {
             const { vaultRegistrar, mockDSToken, mockRegistryService, protocol1, investor1, investor2, vaults } =
                 await loadFixture(deployVaultRegistrar);
 
@@ -568,9 +568,7 @@ describe('VaultRegistrar', function () {
             );
             await vaultRegistrar.connect(protocol1).registerVault(vaults[0].address, investor1.address, deadline, sig);
 
-            await expect(vaultRegistrar.isRegistered(vaults[0].address, investor2.address))
-                .to.be.revertedWithCustomError(vaultRegistrar, 'VaultBelongsToDifferentInvestor')
-                .withArgs(vaults[0].address, INVESTOR_ID);
+            expect(await vaultRegistrar.isRegistered(vaults[0].address, investor2.address)).to.be.false;
         });
 
         it('should return false when investor is not registered', async function () {
