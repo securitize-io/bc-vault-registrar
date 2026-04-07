@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-pragma solidity ^0.8.22;
+pragma solidity ^0.8.24;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IVaultRegistrar} from "../IVaultRegistrar.sol";
@@ -40,21 +40,19 @@ contract MockDeFiProtocol {
     /**
      * @dev Deposits DSTokens for the caller (msg.sender)
      * @param amount The amount of tokens to deposit
+     * @param deadline Unix timestamp after which the investor signature is invalid
+     * @param signature EIP-712 investor signature authorizing vault registration
      */
-    function deposit(uint256 amount) external {
+    function deposit(uint256 amount, uint256 deadline, bytes calldata signature) external {
         address vault = investorVaults[msg.sender];
 
         if (vault == address(0)) {
-            // Deploy new vault and register
             vault = deployVault();
             investorVaults[msg.sender] = vault;
-            // MockDeFiProtocol debe tener OPERATOR_ROLE para llamar registerVault()
-            vaultRegistrar.registerVault(vault, msg.sender);
+            vaultRegistrar.registerVault(vault, msg.sender, deadline, signature);
             emit VaultCreated(msg.sender, vault);
         }
 
-        // Transfer tokens desde la wallet del inversor (msg.sender) hacia el vault
-        // El inversor debe haber hecho approve() primero
         dsToken.transferFrom(msg.sender, vault, amount);
         emit Deposit(msg.sender, vault, amount);
     }

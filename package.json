@@ -1,6 +1,6 @@
 {
     "name": "@securitize/bc-vault-registrar-sc",
-    "version": "0.0.1",
+    "version": "2.0.0",
     "description": "Securitize VaultRegistrar Smart Contract - Register vault addresses under existing investor identities",
     "license": "Apache-2.0",
     "scripts": {
@@ -16,8 +16,12 @@
     },
     "contributors": [
         {
-            "name": "Securitize Blockchain Team",
-            "email": "blockchain@securitize.io"
+            "name": "Nicolas Pellegrini",
+            "email": "nicolas.pellegrini@securitize.io"
+        },
+        {
+            "name": "Joaquin Larranaga",
+            "email": "joaquin.larranaga@securitize.io"
         }
     ],
     "devDependencies": {

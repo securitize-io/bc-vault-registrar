@@ -48,3 +48,6 @@ ignition/deployments/
 .idea/
 
 .vscode/
+
+# Claude Code
+.claude/
